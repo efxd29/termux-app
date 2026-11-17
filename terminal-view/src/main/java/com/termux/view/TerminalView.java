@@ -38,6 +38,7 @@ import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 
 import com.termux.terminal.KeyHandler;
+import com.termux.terminal.TerminalBuffer;
 import com.termux.terminal.TerminalEmulator;
 import com.termux.terminal.TerminalSession;
 import com.termux.view.textselection.TextSelectionCursorController;
@@ -1376,6 +1377,18 @@ public final class TerminalView extends View {
         }
 
         return mTextSelectionCursorController;
+    }
+
+    /**
+     * Select a range of rows in the terminal transcript.
+     */
+    public void selectTextRange(int startY, int endY) {
+        if (mEmulator == null) return;
+        getTextSelectionCursorController().selectTextRange(
+            0, startY, mEmulator.mColumns - 1, endY
+        );
+        if (mClient != null) mClient.copyModeChanged(isSelectingText());
+        invalidate();
     }
 
     private void showTextSelectionCursors(MotionEvent event) {
