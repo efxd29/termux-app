@@ -370,6 +370,47 @@ public class TextSelectionCursorController implements CursorController {
         sel[3] = mSelX2;
     }
 
+    /**
+     * Select a terminal buffer range programmatically.
+     *
+     * @param startX First selected column.
+     * @param startY First selected buffer row.
+     * @param endX Last selected column.
+     * @param endY Last selected buffer row.
+     */
+    public void selectTextRange(int startX, int startY, int endX, int endY) {
+        if (terminalView.mEmulator == null) return;
+
+        TerminalBuffer screen = terminalView.mEmulator.getScreen();
+        int minRow = -screen.getActiveTranscriptRows();
+        int maxRow = terminalView.mEmulator.mRows - 1;
+
+        startY = Math.max(minRow, Math.min(maxRow, startY));
+        endY = Math.max(minRow, Math.min(maxRow, endY));
+        startX = Math.max(0, Math.min(terminalView.mEmulator.mColumns - 1, startX));
+        endX = Math.max(0, Math.min(terminalView.mEmulator.mColumns - 1, endX));
+
+        if (startY > endY || (startY == endY && startX > endX)) {
+            int x = startX, y = startY;
+            startX = endX; startY = endY;
+            endX = x; endY = y;
+        }
+
+        mSelX1 = startX;
+        mSelY1 = startY;
+        mSelX2 = endX;
+        mSelY2 = endY;
+
+        int topRow = Math.min(0, endY - terminalView.mEmulator.mRows + 1);
+        terminalView.setTopRow(Math.max(minRow, topRow));
+
+        mStartHandle.positionAtCursor(mSelX1, mSelY1, true);
+        mEndHandle.positionAtCursor(mSelX2 + 1, mSelY2, true);
+        setActionModeCallBacks();
+        mShowStartTime = System.currentTimeMillis();
+        mIsSelectingText = true;
+    }
+
     /** Get the currently selected text. */
     public String getSelectedText() {
         return terminalView.mEmulator.getSelectedText(mSelX1, mSelY1, mSelX2, mSelY2);
