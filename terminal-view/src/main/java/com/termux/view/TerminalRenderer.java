@@ -84,6 +84,14 @@ public final class TerminalRenderer {
                 selx2 = (row == selectionY2) ? selectionX2 : mEmulator.mColumns;
             }
 
+            // Fill the complete row when the selection spans its full width. This makes
+            // Select All visibly highlighted even on rows with trailing blank cells.
+            if (selx1 <= 0 && selx2 >= columns - 1) {
+                mTextPaint.setColor(palette[TextStyle.COLOR_INDEX_FOREGROUND]);
+                float selectionTop = heightOffset - mFontLineSpacingAndAscent + mFontAscent;
+                canvas.drawRect(0, selectionTop, columns * mFontWidth, heightOffset, mTextPaint);
+            }
+
             TerminalRow lineObject = screen.allocateFullLineIfNecessary(screen.externalToInternalRow(row));
             final char[] line = lineObject.mText;
             final int charsUsedInLine = lineObject.getSpaceUsed();

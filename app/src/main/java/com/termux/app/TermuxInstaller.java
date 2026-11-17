@@ -26,8 +26,10 @@ import com.termux.shared.termux.shell.command.environment.TermuxShellEnvironment
 import java.io.BufferedReader;
 import java.io.ByteArrayInputStream;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.zip.ZipEntry;
@@ -204,6 +206,10 @@ final class TermuxInstaller {
                         }
                     }
 
+                    // Keep the required bootstrap fallback running, but capture its terminal
+                    // output inside the private Termux prefix so first shell startup stays clean.
+                    silenceBootstrapSecondStageFallback();
+
                     if (symlinks.isEmpty())
                         throw new RuntimeException("No SYMLINKS.txt encountered");
                     for (Pair<String, String> symlink : symlinks) {
@@ -369,6 +375,44 @@ final class TermuxInstaller {
                 }
             }
         }.start();
+    }
+
+    private static void silenceBootstrapSecondStageFallback() {
+        File fallbackScript = new File(TERMUX_STAGING_PREFIX_DIR_PATH,
+            "etc/profile.d/01-termux-bootstrap-second-stage-fallback.sh");
+        if (!fallbackScript.isFile()) return;
+
+        try {
+            StringBuilder content = new StringBuilder();
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+                new FileInputStream(fallbackScript), StandardCharsets.UTF_8))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    content.append(line).append('\n');
+                }
+            }
+
+            String script = content.toString();
+            int subshellStart = script.indexOf("(\n");
+            if (subshellStart < 0) {
+                throw new IllegalStateException("Unexpected bootstrap fallback script format");
+            }
+
+            String quietOutput =
+                "\n# Keep bootstrap second-stage output out of the interactive terminal.\n" +
+                "mkdir -p \"$PREFIX/var/log\" >/dev/null 2>&1 || true\n" +
+                "exec >> \"$PREFIX/var/log/termux-bootstrap-second-stage.log\" 2>&1\n";
+            int insertAt = subshellStart + 2;
+            script = script.substring(0, insertAt) + quietOutput + script.substring(insertAt);
+
+            try (FileOutputStream output = new FileOutputStream(fallbackScript, false)) {
+                output.write(script.getBytes(StandardCharsets.UTF_8));
+            }
+            Logger.logInfo(LOG_TAG, "Bootstrap second-stage fallback output redirected to the private prefix log.");
+        } catch (Exception e) {
+            // Do not abort bootstrap installation if a future upstream script changes format.
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not redirect bootstrap fallback output: ", e);
+        }
     }
 
     private static Error ensureDirectoryExists(File directory) {

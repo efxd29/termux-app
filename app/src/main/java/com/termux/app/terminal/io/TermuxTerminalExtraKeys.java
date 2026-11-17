@@ -62,10 +62,12 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             // Append built-in terminal actions in memory; do not modify the user's properties file.
             JSONArray keysMatrix = new JSONArray(extrakeys);
             JSONArray actionRow = new JSONArray();
-            actionRow.put(new JSONObject().put("key", "LAST_RUN").put("display", "LAST RUN"));
-            actionRow.put(new JSONObject().put("key", "COPY_RUN").put("display", "COPY RUN"));
+            actionRow.put(new JSONObject().put("key", "SELECT_LAST").put("display", "SELECT LAST"));
             actionRow.put(new JSONObject().put("key", "SELECT_ALL").put("display", "SELECT ALL"));
-            actionRow.put(new JSONObject().put("key", "COPY_ALL").put("display", "COPY ALL"));
+            actionRow.put(new JSONObject().put("key", "COPY").put("display", "COPY"));
+            actionRow.put(new JSONObject().put("macro", "CTRL c").put("display", "EXIT"));
+            actionRow.put(new JSONObject().put("key", "ENTER").put("display", "ENTER"));
+            actionRow.put(new JSONObject().put("key", "KEYBOARD").put("display", "⌨"));
             keysMatrix.put(actionRow);
             extrakeys = keysMatrix.toString();
 
@@ -113,8 +115,8 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             TerminalView terminalView = mTermuxTerminalViewClient.getActivity().getTerminalView();
             if (terminalView != null && terminalView.mEmulator != null)
                 terminalView.mEmulator.toggleAutoScrollDisabled();
-        } else if ("LAST_RUN".equals(key) || "COPY_RUN".equals(key) ||
-                   "SELECT_ALL".equals(key) || "COPY_ALL".equals(key)) {
+        } else if ("SELECT_LAST".equals(key) ||
+                   "SELECT_ALL".equals(key) || "COPY".equals(key)) {
             TerminalView terminalView = mTermuxTerminalViewClient.getActivity().getTerminalView();
             handleTerminalAction(terminalView, key);
         } else {
@@ -135,8 +137,14 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             return;
         }
 
-        if ("COPY_ALL".equals(action)) {
-            terminalView.mTermSession.onCopyTextToClipboard(screen.getTranscriptText());
+        if ("COPY".equals(action)) {
+            String selectedText = terminalView.getSelectedText();
+            if (selectedText == null || selectedText.isEmpty()) {
+                Logger.showToast(mActivity, "Select text before copying", true);
+                return;
+            }
+            terminalView.stopTextSelectionMode();
+            terminalView.mTermSession.onCopyTextToClipboard(selectedText);
             return;
         }
 
@@ -146,12 +154,8 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             return;
         }
 
-        if ("LAST_RUN".equals(action)) {
+        if ("SELECT_LAST".equals(action)) {
             terminalView.selectTextRange(lastRun[0], lastRun[1]);
-        } else {
-            String text = screen.getSelectedText(0, lastRun[0],
-                terminalView.mEmulator.mColumns - 1, lastRun[1]).trim();
-            terminalView.mTermSession.onCopyTextToClipboard(text);
         }
     }
 

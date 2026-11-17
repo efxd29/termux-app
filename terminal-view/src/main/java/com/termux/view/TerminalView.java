@@ -1384,11 +1384,12 @@ public final class TerminalView extends View {
      */
     public void selectTextRange(int startY, int endY) {
         if (mEmulator == null) return;
+        requestFocus();
         getTextSelectionCursorController().selectTextRange(
             0, startY, mEmulator.mColumns - 1, endY
         );
         if (mClient != null) mClient.copyModeChanged(isSelectingText());
-        invalidate();
+        postInvalidate();
     }
 
     private void showTextSelectionCursors(MotionEvent event) {
