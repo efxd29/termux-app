@@ -1426,6 +1426,16 @@ public final class TerminalView extends View {
         }
     }
 
+    /**
+     * Select a range in the terminal buffer without synthesizing touch events.
+     */
+    public void selectTextRange(int startX, int startY, int endX, int endY) {
+        if (mEmulator == null) return;
+        getTextSelectionCursorController().selectTextRange(startX, startY, endX, endY);
+        mClient.copyModeChanged(isSelectingText());
+        invalidate();
+    }
+
     public void startTextSelectionMode(MotionEvent event) {
         if (!requestFocus()) {
             return;
