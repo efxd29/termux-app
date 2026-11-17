@@ -62,10 +62,11 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             // Append built-in terminal actions in memory; do not modify the user's properties file.
             JSONArray keysMatrix = new JSONArray(extrakeys);
             JSONArray actionRow = new JSONArray();
-            actionRow.put(new JSONObject().put("key", "SELECT_LAST").put("display", "SELECT LAST"));
+            actionRow.put(new JSONObject().put("key", "EXIT_TERMUX").put("display", "EXIT TERMUX"));
+            actionRow.put(new JSONObject().put("macro", "CTRL c").put("display", "EXIT (CTRL+C)"));
             actionRow.put(new JSONObject().put("key", "SELECT_ALL").put("display", "SELECT ALL"));
+            actionRow.put(new JSONObject().put("key", "SELECT_LAST").put("display", "SELEC LAST"));
             actionRow.put(new JSONObject().put("key", "COPY").put("display", "COPY"));
-            actionRow.put(new JSONObject().put("macro", "CTRL c").put("display", "EXIT"));
             actionRow.put(new JSONObject().put("key", "ENTER").put("display", "ENTER"));
             actionRow.put(new JSONObject().put("key", "KEYBOARD").put("display", "⌨"));
             keysMatrix.put(actionRow);
@@ -99,7 +100,9 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
     @SuppressLint("RtlHardcoded")
     @Override
     public void onTerminalExtraKeyButtonClick(View view, String key, boolean ctrlDown, boolean altDown, boolean shiftDown, boolean fnDown) {
-        if ("KEYBOARD".equals(key)) {
+        if ("EXIT_TERMUX".equals(key)) {
+            mActivity.finishActivityIfNotFinishing();
+        } else if ("KEYBOARD".equals(key)) {
             if(mTermuxTerminalViewClient != null)
                 mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
         } else if ("DRAWER".equals(key)) {
