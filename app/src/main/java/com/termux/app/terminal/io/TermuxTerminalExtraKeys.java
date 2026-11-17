@@ -63,7 +63,7 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             JSONArray keysMatrix = new JSONArray(extrakeys);
             JSONArray actionRow = new JSONArray();
             actionRow.put(new JSONObject().put("key", "EXIT_TERMUX").put("display", "EXIT TERMUX"));
-            actionRow.put(new JSONObject().put("macro", "CTRL c").put("display", "EXIT (CTRL+C)"));
+            actionRow.put(new JSONObject().put("macro", "CTRL c").put("display", "EXIT"));
             actionRow.put(new JSONObject().put("key", "SELECT_ALL").put("display", "SELECT ALL"));
             actionRow.put(new JSONObject().put("key", "SELECT_LAST").put("display", "SELEC LAST"));
             actionRow.put(new JSONObject().put("key", "COPY").put("display", "COPY"));
