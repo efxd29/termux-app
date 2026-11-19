@@ -314,12 +314,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
         });
         findViewById(R.id.macos_minimize).setOnClickListener(v -> {
-            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'd');
-            else moveTaskToBack(true);
+            toggleKeepScreenOn();
         });
         findViewById(R.id.macos_zoom).setOnClickListener(v -> {
-            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'z');
-            else toggleMacZoom();
+            onBackPressed();
         });
         updateMacTitleBar();
         setupSessionDrawerEffects();
