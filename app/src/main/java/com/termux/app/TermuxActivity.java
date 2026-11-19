@@ -262,9 +262,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return insets;
         });
 
-        // Match the reference terminal frame: the custom title bar occupies the top edge.
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-
         setTermuxTerminalViewAndClients();
 
         setTerminalToolbarView(savedInstanceState);
@@ -484,11 +481,29 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void applyMacUiMode() {
-        boolean light = getSharedPreferences("terminal_ui", MODE_PRIVATE).getBoolean("light_mode", false);
+        android.content.SharedPreferences ui = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        boolean light = ui.getBoolean("light_mode", false);
+        boolean showStatusBar = ui.getBoolean("show_status_bar", true);
         View bar = findViewById(R.id.macos_title_bar);
         TextView title = findViewById(R.id.macos_title);
         if (bar != null) bar.setBackgroundColor(Color.parseColor(light ? "#f1f1f1" : "#35353a"));
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
+        if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            View decor = getWindow().getDecorView();
+            int systemUi = decor.getSystemUiVisibility();
+            systemUi = light ? systemUi | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : systemUi & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            decor.setSystemUiVisibility(systemUi);
+        }
+        if (mExtraKeysView != null) {
+            mExtraKeysView.setButtonColors(light ? Color.parseColor("#202124") : Color.WHITE,
+                Color.parseColor("#febc2e"), Color.TRANSPARENT, Color.TRANSPARENT);
+            if (mTermuxTerminalExtraKeys != null) {
+                mTermuxTerminalExtraKeys.reloadCustomExtraKeys();
+                mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
+            }
+        }
     }
 
     @Override
@@ -1005,13 +1020,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
     private void toggleKeepScreenOn() {
-        if (mTerminalView.getKeepScreenOn()) {
-            mTerminalView.setKeepScreenOn(false);
-            mPreferences.setKeepScreenOn(false);
-        } else {
-            mTerminalView.setKeepScreenOn(true);
-            mPreferences.setKeepScreenOn(true);
-        }
+        boolean enableWakeLock = !mPreferences.shouldKeepScreenOn();
+        mPreferences.setKeepScreenOn(enableWakeLock);
+        mTerminalView.setKeepScreenOn(enableWakeLock);
     }
 
 

@@ -16,16 +16,6 @@
             app:summaryOn="@string/termux_soft_keyboard_enabled_only_if_no_hardware_on"
             app:title="@string/termux_soft_keyboard_enabled_only_if_no_hardware_title" />
 
-        <SwitchPreferenceCompat
-            app:key="light_mode"
-            app:defaultValue="false"
-            app:title="Mode terang" />
-
-        <Preference
-            app:key="custom_extra_keys"
-            app:title="Atur tombol keyboard Termux"
-            app:summary="Susun tombol khusus dalam maksimal 3 baris" />
-
     </PreferenceCategory>
 
 </PreferenceScreen>
