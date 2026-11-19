@@ -12,6 +12,8 @@ import android.content.ServiceConnection;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -25,6 +27,9 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
+import android.widget.TextView;
+import android.graphics.Typeface;
+import java.io.File;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
@@ -175,6 +180,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private float mTerminalToolbarDefaultHeight;
 
+    private final Handler mTitleBarHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mTitleBarUpdater = new Runnable() {
+        @Override public void run() {
+            updateMacTitleBar();
+            mTitleBarHandler.postDelayed(this, 1000);
+        }
+    };
+
 
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
     private static final int CONTEXT_MENU_SHARE_TRANSCRIPT_ID = 1;
@@ -244,6 +257,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setTermuxTerminalViewAndClients();
 
         setTerminalToolbarView(savedInstanceState);
+        setupMacTitleBar();
 
         setSettingsButtonView();
 
@@ -279,6 +293,54 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         TermuxUtils.sendTermuxOpenedBroadcast(this);
     }
 
+    private void setupMacTitleBar() {
+        findViewById(R.id.macos_close).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'x'));
+        findViewById(R.id.macos_minimize).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'd'));
+        findViewById(R.id.macos_zoom).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'z'));
+        updateMacTitleBar();
+    }
+
+    /** Send the standard tmux prefix (Ctrl-B) followed by its default key binding. */
+    private void sendTmuxPrefixCommand(byte key) {
+        TerminalSession session = getCurrentSession();
+        if (session == null || !session.isRunning()) return;
+        session.write(new byte[] { 2, key }, 0, 2);
+    }
+
+    private void updateMacTitleBar() {
+        TextView titleView = findViewById(R.id.macos_title);
+        TextView homeIconView = findViewById(R.id.macos_home_icon);
+        if (titleView == null) return;
+        File userFont = new File(getFilesDir(), "home/.termux/font.ttf");
+        if (userFont.isFile() && homeIconView != null) {
+            try {
+                homeIconView.setTypeface(Typeface.createFromFile(userFont));
+            } catch (RuntimeException ignored) {
+                // Keep the platform fallback if the configured font cannot be loaded.
+            }
+        }
+        TerminalSession session = getCurrentSession();
+        String folder = "~";
+        String shell = "zsh";
+        String size = "--x--";
+        if (session != null) {
+            String cwd = session.getCwd();
+            if (cwd != null) {
+                String home = getFilesDir().getAbsolutePath() + "/home";
+                if (!cwd.equals(home)) {
+                    int slash = cwd.lastIndexOf('/');
+                    folder = slash >= 0 ? cwd.substring(slash + 1) : cwd;
+                    if (folder.isEmpty()) folder = "/";
+                }
+            }
+            String terminalTitle = session.getTitle();
+            if (terminalTitle != null && !terminalTitle.trim().isEmpty()) shell = terminalTitle.trim();
+            if (session.getEmulator() != null)
+                size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
+        }
+        titleView.setText(folder + " — " + shell + " — " + size);
+    }
+
     @Override
     public void onStart() {
         super.onStart();
@@ -288,6 +350,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = true;
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
+        mTitleBarHandler.post(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -331,6 +395,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = false;
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -347,6 +412,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         Logger.logDebug(LOG_TAG, "onDestroy");
 
