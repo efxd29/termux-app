@@ -442,6 +442,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
         }
         titleView.setText(folder + " — " + shell + " — " + size);
+        titleView.setSelected(true);
     }
 
     @Override
