@@ -305,7 +305,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
-        setupTripleTapExtraKeysToggle();
+        setupTwoFingerDoubleTapExtraKeysToggle();
         findViewById(R.id.macos_close).setOnClickListener(v -> {
             if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'x');
             else {
@@ -325,19 +325,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setupSessionDrawerEffects();
     }
 
-    /** Triple tap the terminal to hide or restore Termux's extra-keys toolbar. */
-    private void setupTripleTapExtraKeysToggle() {
+    /** Two successive two-finger taps toggle Termux's extra-keys area. */
+    private void setupTwoFingerDoubleTapExtraKeysToggle() {
         final long[] lastTapTime = {0L};
         final float[] lastTapX = {0f};
         final float[] lastTapY = {0f};
         final int[] tapCount = {0};
+        final boolean[] multiTouchTap = {false};
         final float tapSlop = 48f * getResources().getDisplayMetrics().density;
         mTerminalView.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
             if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP) return false;
+            if (!multiTouchTap[0]) { tapCount[0] = 0; return false; }
+            multiTouchTap[0] = false;
             long now = SystemClock.uptimeMillis();
             float dx = event.getX() - lastTapX[0];
             float dy = event.getY() - lastTapY[0];
-            if (tapCount[0] > 0 && now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
+            if (now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
                 tapCount[0]++;
             } else {
                 tapCount[0] = 1;
@@ -345,9 +349,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             lastTapTime[0] = now;
             lastTapX[0] = event.getX();
             lastTapY[0] = event.getY();
-            if (tapCount[0] == 3) {
-                View toolbar = getTerminalToolbarViewPager();
-                toolbar.setVisibility(toolbar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+            if (tapCount[0] == 2) {
+                toggleTerminalToolbar();
                 tapCount[0] = 0;
             }
             return false;
@@ -449,6 +452,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (mIsInvalidState) return;
 
+        applyMacUiMode();
+        if (mTermuxTerminalExtraKeys != null) {
+            mTermuxTerminalExtraKeys.reloadCustomExtraKeys();
+            if (mExtraKeysView != null) mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
+            setTerminalToolbarHeight();
+        }
+        if (mTermuxTerminalSessionActivityClient != null) mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
+
         mIsVisible = true;
         mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
         mTitleBarHandler.post(mTitleBarUpdater);
@@ -463,6 +474,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             addTermuxActivityRootViewGlobalLayoutListener();
 
         registerTermuxActivityBroadcastReceiver();
+    }
+
+    private void applyMacUiMode() {
+        boolean light = getSharedPreferences("terminal_ui", MODE_PRIVATE).getBoolean("light_mode", false);
+        View bar = findViewById(R.id.macos_title_bar);
+        TextView title = findViewById(R.id.macos_title);
+        if (bar != null) bar.setBackgroundColor(Color.parseColor(light ? "#f1f1f1" : "#35353a"));
+        if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
     }
 
     @Override
@@ -738,7 +757,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
 
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (mPreferences.shouldShowTerminalToolbar()) terminalToolbarViewPager.setVisibility(View.VISIBLE);
+        terminalToolbarViewPager.setVisibility(View.GONE);
+        if (mPreferences.shouldShowTerminalToolbar()) mPreferences.toogleShowTerminalToolbar();
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
         mTerminalToolbarDefaultHeight = layoutParams.height;
@@ -769,7 +789,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (terminalToolbarViewPager == null) return;
 
         final boolean showNow = mPreferences.toogleShowTerminalToolbar();
-        Logger.showToast(this, (showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar)), true);
         terminalToolbarViewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
         if (showNow && isTerminalToolbarTextInputViewSelected()) {
             // Focus the text input view if just revealed.
