@@ -33,8 +33,8 @@ set -g default-terminal "tmux-256color"
 set -ag terminal-overrides ",*:RGB"
 ```
 
-The three title bar buttons send tmux's default Ctrl-B prefix plus `x`, `d`, or `z`: kill-pane (tmux asks for confirmation), detach-client, and resize-pane -Z. They require a running tmux client using the default prefix key. Nerd Font glyphs require a font containing U+F10B5; put the font at `~/.termux/font.ttf`, then restart Termux.
+The three title bar buttons send tmux's default Ctrl-B prefix plus `x`, `d`, or `z`: kill-pane (tmux asks for confirmation), detach-client, and resize-pane -Z. They require a running tmux client using the default prefix key. The title bar folder icon uses the supplied PNG image asset.
 
-## Optional custom folder-home glyph
+## Optional custom font glyph
 
-To make a custom icon, convert the supplied folder-home SVG to a monochrome vector outline, import it into FontForge or Fontello, assign it to a private-use code point, export a TTF, and install it as `~/.termux/font.ttf`. If you use U+F10B5, the app title bar already requests that code point. The glyph design will follow the font's metrics and rendering; this does not embed the provided PNG as a bitmap.
+For other terminal glyphs, install a Nerd Font at `~/.termux/font.ttf` and restart Termux. The title bar folder icon is the supplied image asset and does not depend on a Nerd Font.

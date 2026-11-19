@@ -28,8 +28,6 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 import android.widget.TextView;
-import android.graphics.Typeface;
-import java.io.File;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
@@ -250,9 +248,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return insets;
         });
 
-        if (mProperties.isUsingFullScreen()) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        }
+        // Match the reference terminal frame: the custom title bar occupies the top edge.
+        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
 
         setTermuxTerminalViewAndClients();
 
@@ -309,32 +306,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
     private void updateMacTitleBar() {
         TextView titleView = findViewById(R.id.macos_title);
-        TextView homeIconView = findViewById(R.id.macos_home_icon);
         if (titleView == null) return;
-        File userFont = new File(getFilesDir(), "home/.termux/font.ttf");
-        if (userFont.isFile() && homeIconView != null) {
-            try {
-                homeIconView.setTypeface(Typeface.createFromFile(userFont));
-            } catch (RuntimeException ignored) {
-                // Keep the platform fallback if the configured font cannot be loaded.
-            }
-        }
         TerminalSession session = getCurrentSession();
-        String folder = "~";
-        String shell = "zsh";
+        String folder = "efxd29";
+        String shell = "-zsh";
         String size = "--x--";
         if (session != null) {
-            String cwd = session.getCwd();
-            if (cwd != null) {
-                String home = getFilesDir().getAbsolutePath() + "/home";
-                if (!cwd.equals(home)) {
-                    int slash = cwd.lastIndexOf('/');
-                    folder = slash >= 0 ? cwd.substring(slash + 1) : cwd;
-                    if (folder.isEmpty()) folder = "/";
-                }
-            }
             String terminalTitle = session.getTitle();
-            if (terminalTitle != null && !terminalTitle.trim().isEmpty()) shell = terminalTitle.trim();
+            if (terminalTitle != null && !terminalTitle.trim().isEmpty()) {
+                shell = terminalTitle.trim();
+                if ("zsh".equalsIgnoreCase(shell)) shell = "-zsh";
+            }
             if (session.getEmulator() != null)
                 size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
         }
