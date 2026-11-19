@@ -17,9 +17,9 @@
         android:paddingEnd="3.3dp"
         android:background="#35353a">
 
-        <View android:id="@+id/macos_close" style="@style/MacTitleDot" android:background="@drawable/macos_dot_red" android:contentDescription="Kill tmux pane" />
-        <View android:id="@+id/macos_minimize" style="@style/MacTitleDot" android:background="@drawable/macos_dot_yellow" android:contentDescription="Detach tmux client" />
-        <View android:id="@+id/macos_zoom" style="@style/MacTitleDot" android:background="@drawable/macos_dot_green" android:contentDescription="Zoom tmux pane" />
+        <TextView android:id="@+id/macos_close" style="@style/MacTitleDot" android:text="●" android:textColor="#fe5e56" android:contentDescription="Quit session" />
+        <TextView android:id="@+id/macos_minimize" style="@style/MacTitleDot" android:text="●" android:textColor="#febc2e" android:contentDescription="Toggle wake lock" />
+        <TextView android:id="@+id/macos_zoom" style="@style/MacTitleDot" android:text="●" android:textColor="#28c840" android:contentDescription="Back" />
 
         <LinearLayout
             android:layout_width="0dp"
