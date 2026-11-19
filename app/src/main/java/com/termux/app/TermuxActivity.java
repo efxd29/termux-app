@@ -758,8 +758,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
 
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        terminalToolbarViewPager.setVisibility(View.GONE);
-        if (mPreferences.shouldShowTerminalToolbar()) mPreferences.toogleShowTerminalToolbar();
+        android.content.SharedPreferences uiPrefs = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        if (!uiPrefs.getBoolean("extra_keys_default_migrated", false)) {
+            if (mPreferences.shouldShowTerminalToolbar()) mPreferences.toogleShowTerminalToolbar();
+            uiPrefs.edit().putBoolean("extra_keys_default_migrated", true).apply();
+        }
+        terminalToolbarViewPager.setVisibility(mPreferences.shouldShowTerminalToolbar() ? View.VISIBLE : View.GONE);
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
         mTerminalToolbarDefaultHeight = layoutParams.height;
