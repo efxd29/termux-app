@@ -18,6 +18,7 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -304,6 +305,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
+        setupTripleTapExtraKeysToggle();
         findViewById(R.id.macos_close).setOnClickListener(v -> {
             if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'x');
             else {
@@ -321,6 +323,35 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         });
         updateMacTitleBar();
         setupSessionDrawerEffects();
+    }
+
+    /** Triple tap the terminal to hide or restore Termux's extra-keys toolbar. */
+    private void setupTripleTapExtraKeysToggle() {
+        final long[] lastTapTime = {0L};
+        final float[] lastTapX = {0f};
+        final float[] lastTapY = {0f};
+        final int[] tapCount = {0};
+        final float tapSlop = 48f * getResources().getDisplayMetrics().density;
+        mTerminalView.setOnTouchListener((view, event) -> {
+            if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP) return false;
+            long now = SystemClock.uptimeMillis();
+            float dx = event.getX() - lastTapX[0];
+            float dy = event.getY() - lastTapY[0];
+            if (tapCount[0] > 0 && now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
+                tapCount[0]++;
+            } else {
+                tapCount[0] = 1;
+            }
+            lastTapTime[0] = now;
+            lastTapX[0] = event.getX();
+            lastTapY[0] = event.getY();
+            if (tapCount[0] == 3) {
+                View toolbar = getTerminalToolbarViewPager();
+                toolbar.setVisibility(toolbar.getVisibility() == View.VISIBLE ? View.GONE : View.VISIBLE);
+                tapCount[0] = 0;
+            }
+            return false;
+        });
     }
 
     private void setupSessionDrawerEffects() {
