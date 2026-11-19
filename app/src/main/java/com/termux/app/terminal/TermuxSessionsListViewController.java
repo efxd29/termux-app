@@ -32,7 +32,6 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
     final TermuxActivity mActivity;
 
     final StyleSpan boldSpan = new StyleSpan(Typeface.BOLD);
-    final StyleSpan italicSpan = new StyleSpan(Typeface.ITALIC);
 
     public TermuxSessionsListViewController(TermuxActivity activity, List<TermuxSession> sessionList) {
         super(activity.getApplicationContext(), R.layout.item_terminal_sessions_list, sessionList);
@@ -59,23 +58,16 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
 
         boolean shouldEnableDarkTheme = ThemeUtils.shouldEnableDarkTheme(mActivity, NightMode.getAppNightMode().getName());
 
-        if (shouldEnableDarkTheme) {
-            sessionTitleView.setBackground(
-                ContextCompat.getDrawable(mActivity, R.drawable.session_background_black_selected)
-            );
-        }
-
         String name = sessionAtRow.mSessionName;
         String sessionTitle = sessionAtRow.getTitle();
 
-        String numberPart = "[" + (position + 1) + "] ";
+        String numberPart = (position + 1) + ". ";
         String sessionNamePart = (TextUtils.isEmpty(name) ? "" : name);
         String sessionTitlePart = (TextUtils.isEmpty(sessionTitle) ? "" : ((sessionNamePart.isEmpty() ? "" : "\n") + sessionTitle));
 
         String fullSessionTitle = numberPart + sessionNamePart + sessionTitlePart;
         SpannableString fullSessionTitleStyled = new SpannableString(fullSessionTitle);
-        fullSessionTitleStyled.setSpan(boldSpan, 0, numberPart.length() + sessionNamePart.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        fullSessionTitleStyled.setSpan(italicSpan, numberPart.length() + sessionNamePart.length(), fullSessionTitle.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        fullSessionTitleStyled.setSpan(boldSpan, 0, numberPart.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
 
         sessionTitleView.setText(fullSessionTitleStyled);
 
@@ -89,6 +81,9 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
         int defaultColor = shouldEnableDarkTheme ? Color.WHITE : Color.BLACK;
         int color = sessionRunning || sessionAtRow.getExitStatus() == 0 ? defaultColor : Color.RED;
         sessionTitleView.setTextColor(color);
+        boolean selected = sessionAtRow == mActivity.getCurrentSession();
+        sessionTitleView.setActivated(selected);
+        sessionTitleView.setBackground(ContextCompat.getDrawable(mActivity, R.drawable.session_background_selected));
         return sessionRowView;
     }
 
