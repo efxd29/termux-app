@@ -305,12 +305,7 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     }
 
     void notifyOfSessionChange() {
-        if (!mActivity.isVisible()) return;
-
-        if (!mActivity.getProperties().areTerminalSessionChangeToastsDisabled()) {
-            TerminalSession session = mActivity.getCurrentSession();
-            mActivity.showToast(toToastTitle(session), false);
-        }
+        // Session changes are already visible in the title bar and session drawer.
     }
 
     public void switchToSession(boolean forward) {
@@ -501,6 +496,11 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                 try (InputStream in = new FileInputStream(colorsFile)) {
                     props.load(in);
                 }
+            }
+
+            if (mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE).getBoolean("light_mode", false)) {
+                props.setProperty("background", "#ffffff");
+                props.setProperty("foreground", "#1e1e1e");
             }
 
             TerminalColors.COLOR_SCHEME.updateWith(props);
