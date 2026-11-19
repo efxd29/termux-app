@@ -305,7 +305,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
-        setupTwoFingerDoubleTapExtraKeysToggle();
+        setupDoubleTapExtraKeysToggle();
         findViewById(R.id.macos_close).setOnClickListener(v -> {
             if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'x');
             else {
@@ -323,8 +323,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setupSessionDrawerEffects();
     }
 
-    /** Two successive two-finger taps toggle Termux's extra-keys area. */
-    private void setupTwoFingerDoubleTapExtraKeysToggle() {
+    /** Two successive single-finger taps toggle Termux's extra-keys area. */
+    private void setupDoubleTapExtraKeysToggle() {
         final long[] lastTapTime = {0L};
         final float[] lastTapX = {0f};
         final float[] lastTapY = {0f};
@@ -333,9 +333,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         final float tapSlop = 48f * getResources().getDisplayMetrics().density;
         mTerminalView.setOnTouchListener((view, event) -> {
             if (event.getActionMasked() == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
+            if (event.getActionMasked() == android.view.MotionEvent.ACTION_CANCEL) {
+                tapCount[0] = 0;
+                multiTouchTap[0] = false;
+                return false;
+            }
             if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP) return false;
-            if (!multiTouchTap[0]) { tapCount[0] = 0; return false; }
-            multiTouchTap[0] = false;
+            if (multiTouchTap[0]) {
+                tapCount[0] = 0;
+                multiTouchTap[0] = false;
+                return false;
+            }
             long now = SystemClock.uptimeMillis();
             float dx = event.getX() - lastTapX[0];
             float dy = event.getY() - lastTapY[0];
