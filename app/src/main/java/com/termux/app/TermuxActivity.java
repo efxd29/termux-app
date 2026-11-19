@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 12270)
-Total output lines: 1208
-
 package com.termux.app;
 
 import android.annotation.SuppressLint;
@@ -605,7 +602,23 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (target.isFile()) {
             try {
                 String current;
-                try (FileInputStream in = new FileInputStream(target); ByteArr…270 tokens truncated…  } catch (Exception e) {
+                try (FileInputStream in = new FileInputStream(target); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+                }
+                if (current.contains(marker)) return;
+                try (FileOutputStream out = new FileOutputStream(target, true)) {
+                    out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure shell prompt in " + target.getName(), e);
+            }
+        } else {
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                out.write((marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
                 Logger.logStackTraceWithMessage(LOG_TAG, "Could not create " + target.getName(), e);
             }
         }
