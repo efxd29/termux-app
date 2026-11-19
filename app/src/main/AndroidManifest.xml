@@ -41,7 +41,7 @@
         android:name=".app.TermuxApplication"
         android:allowBackup="false"
         android:banner="@drawable/banner"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/terminal_icon"
         android:label="@string/application_name"
         android:requestLegacyExternalStorage="true"
         android:roundIcon="@drawable/terminal_icon"
