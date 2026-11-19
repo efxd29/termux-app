@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 12270)
+Total output lines: 1208
+
 package com.termux.app;
 
 import android.annotation.SuppressLint;
@@ -188,6 +191,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private int mNavBarHeight;
 
     private float mTerminalToolbarDefaultHeight;
+    private Integer mZoomFontSizeBeforeMacZoom;
 
     private final Handler mTitleBarHandler = new Handler(Looper.getMainLooper());
     private final Runnable mTitleBarUpdater = new Runnable() {
@@ -303,9 +307,21 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
-        findViewById(R.id.macos_close).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'x'));
-        findViewById(R.id.macos_minimize).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'd'));
-        findViewById(R.id.macos_zoom).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'z'));
+        findViewById(R.id.macos_close).setOnClickListener(v -> {
+            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'x');
+            else {
+                TerminalSession session = getCurrentSession();
+                if (session != null) session.finishIfRunning();
+            }
+        });
+        findViewById(R.id.macos_minimize).setOnClickListener(v -> {
+            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'd');
+            else moveTaskToBack(true);
+        });
+        findViewById(R.id.macos_zoom).setOnClickListener(v -> {
+            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'z');
+            else toggleMacZoom();
+        });
         updateMacTitleBar();
         setupSessionDrawerEffects();
     }
@@ -353,6 +369,24 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         session.write(new byte[] { 2, key }, 0, 2);
     }
 
+    private boolean isCurrentSessionInTmux() {
+        TerminalSession session = getCurrentSession();
+        String title = session == null ? null : session.getTitle();
+        return title != null && title.endsWith("|tmux");
+    }
+
+    private void toggleMacZoom() {
+        if (mZoomFontSizeBeforeMacZoom == null) {
+            mZoomFontSizeBeforeMacZoom = mPreferences.getFontSize();
+            mPreferences.setFontSize(Math.min(256, mZoomFontSizeBeforeMacZoom + 2));
+        } else {
+            mPreferences.setFontSize(mZoomFontSizeBeforeMacZoom);
+            mZoomFontSizeBeforeMacZoom = null;
+        }
+        if (mTermuxTerminalSessionActivityClient != null)
+            mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
+    }
+
     private void updateMacTitleBar() {
         TextView titleView = findViewById(R.id.macos_title);
         if (titleView == null) return;
@@ -363,9 +397,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (session != null) {
             String terminalTitle = session.getTitle();
             if (terminalTitle != null && !terminalTitle.trim().isEmpty()) {
-                String[] titleParts = terminalTitle.trim().split("\\|", 2);
-                if (titleParts.length == 2) shell = "-" + titleParts[0];
-                String cwd = titleParts.length == 2 ? titleParts[1] : titleParts[0];
+                String[] titleParts = terminalTitle.trim().split("\\|", -1);
+                if (titleParts.length >= 2) shell = "-" + titleParts[0];
+                String cwd = titleParts.length >= 2 ? titleParts[1] : titleParts[0];
+                if (titleParts.length >= 3 && "tmux".equals(titleParts[2])) shell = "-" + titleParts[0] + " (tmux)";
                 if (cwd.startsWith("@efxd29 ")) cwd = cwd.substring("@efxd29 ".length());
                 int slash = cwd.lastIndexOf('/');
                 folder = slash >= 0 && slash + 1 < cwd.length() ? cwd.substring(slash + 1) : cwd;
@@ -570,23 +605,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (target.isFile()) {
             try {
                 String current;
-                try (FileInputStream in = new FileInputStream(target); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
-                    byte[] buffer = new byte[4096];
-                    int count;
-                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
-                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
-                }
-                if (current.contains(marker)) return;
-                try (FileOutputStream out = new FileOutputStream(target, true)) {
-                    out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
-                }
-            } catch (Exception e) {
-                Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure shell prompt in " + target.getName(), e);
-            }
-        } else {
-            try (FileOutputStream out = new FileOutputStream(target)) {
-                out.write((marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
-            } catch (Exception e) {
+                try (FileInputStream in = new FileInputStream(target); ByteArr…270 tokens truncated…  } catch (Exception e) {
                 Logger.logStackTraceWithMessage(LOG_TAG, "Could not create " + target.getName(), e);
             }
         }
