@@ -9,6 +9,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.graphics.Color;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
+import android.os.Build;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -28,6 +32,13 @@ import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
 import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
@@ -225,6 +236,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_termux);
+        installBundledFontIfMissing();
 
         // Load termux shared preferences
         // This will also fail if TermuxConstants.TERMUX_PACKAGE_NAME does not equal applicationId
@@ -295,6 +307,43 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         findViewById(R.id.macos_minimize).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'd'));
         findViewById(R.id.macos_zoom).setOnClickListener(v -> sendTmuxPrefixCommand((byte) 'z'));
         updateMacTitleBar();
+        setupSessionDrawerEffects();
+    }
+
+    private void setupSessionDrawerEffects() {
+        DrawerLayout drawer = getDrawer();
+        View sessionDrawer = findViewById(R.id.left_drawer);
+        drawer.setScrimColor(Color.TRANSPARENT);
+        sessionDrawer.setBackgroundColor(Color.TRANSPARENT);
+        drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    float radius = 22f * Math.max(0f, Math.min(1f, slideOffset));
+                    mTerminalView.setRenderEffect(radius > 0f
+                        ? RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP) : null);
+                }
+            }
+            @Override public void onDrawerClosed(@NonNull View drawerView) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) mTerminalView.setRenderEffect(null);
+            }
+        });
+    }
+
+    private void installBundledFontIfMissing() {
+        File font = TermuxConstants.TERMUX_FONT_FILE;
+        if (font.isFile() && font.length() > 0) return;
+        try {
+            File parent = font.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) return;
+            try (InputStream in = getAssets().open("SFMonoRegular.otf");
+                 FileOutputStream out = new FileOutputStream(font)) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not install bundled SF Mono font", e);
+        }
     }
 
     /** Send the standard tmux prefix (Ctrl-B) followed by its default key binding. */
@@ -314,8 +363,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (session != null) {
             String terminalTitle = session.getTitle();
             if (terminalTitle != null && !terminalTitle.trim().isEmpty()) {
-                shell = terminalTitle.trim();
-                if ("zsh".equalsIgnoreCase(shell)) shell = "-zsh";
+                String[] titleParts = terminalTitle.trim().split("\\|", 2);
+                if (titleParts.length == 2) shell = "-" + titleParts[0];
+                String cwd = titleParts.length == 2 ? titleParts[1] : titleParts[0];
+                if (cwd.startsWith("@efxd29 ")) cwd = cwd.substring("@efxd29 ".length());
+                int slash = cwd.lastIndexOf('/');
+                folder = slash >= 0 && slash + 1 < cwd.length() ? cwd.substring(slash + 1) : cwd;
+                if ("/".equals(cwd)) folder = "/";
+                if ("~".equals(cwd) || cwd.endsWith("/home")) folder = "efxd29";
             }
             if (session.getEmulator() != null)
                 size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
@@ -447,6 +502,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
                     if (mTermuxService == null) return; // Activity might have been destroyed.
                     try {
+                        installTerminalDefaults();
                         boolean launchFailsafe = false;
                         if (intent != null && intent.getExtras() != null) {
                             launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
@@ -461,6 +517,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 finishActivityIfNotFinishing();
             }
         } else {
+            installTerminalDefaults();
             // If termux was started from launcher "New session" shortcut and activity is recreated,
             // then the original intent will be re-delivered, resulting in a new session being re-added
             // each time.
@@ -475,6 +532,64 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+    }
+
+    /** Apply the bundled first-run shell look without overwriting the user's existing dotfiles. */
+    private void installTerminalDefaults() {
+        File home = new File(getFilesDir(), "home");
+        if (!home.exists() && !home.mkdirs()) return;
+        File termuxConfig = new File(home, ".termux");
+        if (!termuxConfig.exists() && !termuxConfig.mkdirs()) return;
+        copyAssetIfAbsent("macos-shell.sh", new File(termuxConfig, "macos-shell.sh"));
+        copyAssetIfAbsent("colors.properties", new File(termuxConfig, "colors.properties"));
+        appendShellConfig(new File(home, ".bash_profile"));
+        appendShellConfig(new File(home, ".bashrc"));
+        appendShellConfig(new File(home, ".zshrc"));
+
+        // The welcome text is the bootstrap MOTD; blank it after bootstrap and before the first shell.
+        File motd = new File(new File(getFilesDir(), "usr/etc"), "motd");
+        if (motd.isFile()) {
+            try (FileOutputStream out = new FileOutputStream(motd, false)) { out.write(new byte[0]); }
+            catch (Exception e) { Logger.logStackTraceWithMessage(LOG_TAG, "Could not clear Termux MOTD", e); }
+        }
+    }
+
+    private void copyAssetIfAbsent(String asset, File target) {
+        if (target.exists()) return;
+        try (InputStream in = getAssets().open(asset); FileOutputStream out = new FileOutputStream(target)) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not install default " + asset, e);
+        }
+    }
+
+    private void appendShellConfig(File target) {
+        final String marker = "# Termux macOS-style prompt";
+        if (target.isFile()) {
+            try {
+                String current;
+                try (FileInputStream in = new FileInputStream(target); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+                }
+                if (current.contains(marker)) return;
+                try (FileOutputStream out = new FileOutputStream(target, true)) {
+                    out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure shell prompt in " + target.getName(), e);
+            }
+        } else {
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                out.write((marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not create " + target.getName(), e);
+            }
+        }
     }
 
     @Override
