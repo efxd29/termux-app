@@ -484,10 +484,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         android.content.SharedPreferences ui = getSharedPreferences("terminal_ui", MODE_PRIVATE);
         boolean light = ui.getBoolean("light_mode", false);
         boolean showStatusBar = ui.getBoolean("show_status_bar", true);
+        if (mPreferences != null && mPreferences.shouldKeepScreenOn()) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         View bar = findViewById(R.id.macos_title_bar);
         TextView title = findViewById(R.id.macos_title);
         if (bar != null) bar.setBackgroundColor(Color.parseColor(light ? "#f1f1f1" : "#35353a"));
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
+        ImageButton settings = findViewById(R.id.settings_button);
+        if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
         if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -1022,7 +1026,9 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void toggleKeepScreenOn() {
         boolean enableWakeLock = !mPreferences.shouldKeepScreenOn();
         mPreferences.setKeepScreenOn(enableWakeLock);
-        mTerminalView.setKeepScreenOn(enableWakeLock);
+        if (mTerminalView != null) mTerminalView.setKeepScreenOn(enableWakeLock);
+        if (enableWakeLock) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
 
 

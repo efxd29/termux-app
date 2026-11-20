@@ -305,6 +305,11 @@ public final class ExtraKeysView extends GridLayout {
 
     /** Pick an idle special-key accent so Ctrl/Alt keys are distinct when they are not held. */
     public int getIdleSpecialButtonTextColor() {
+        return mButtonTextColor;
+    }
+
+    /** Pick one of the title-bar accent colors for brief feedback on an ordinary key tap. */
+    public int getTappedKeyAccentColor() {
         int[] colors = { Color.rgb(79, 176, 240), Color.rgb(254, 94, 86), Color.rgb(40, 200, 64) };
         return colors[ThreadLocalRandom.current().nextInt(colors.length)];
     }
@@ -427,6 +432,12 @@ public final class ExtraKeysView extends GridLayout {
                 button.setOnClickListener(view -> {
                     performExtraKeyButtonHapticFeedback(view, buttonInfo, button);
                     onAnyExtraKeyButtonClick(view, buttonInfo, button);
+                    // Ordinary keys flash a title-bar accent after a tap. Modifiers
+                    // use the yellow active state managed by SpecialButtonState.
+                    if (!isSpecialButton(buttonInfo)) {
+                        button.setTextColor(getTappedKeyAccentColor());
+                        button.postDelayed(() -> button.setTextColor(mButtonTextColor), 320);
+                    }
                 });
 
                 button.setOnTouchListener((view, event) -> {
