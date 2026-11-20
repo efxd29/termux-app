@@ -291,7 +291,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
     }
 
     void notifyOfSessionChange() {
-        // Session changes are already visible in the title bar and session drawer.
+        if (!mActivity.isVisible()) return;
+
+        if (!mActivity.getProperties().areTerminalSessionChangeToastsDisabled()) {
+            TerminalSession session = mActivity.getCurrentSession();
+            mActivity.showToast(toToastTitle(session), false);
+        }
     }
 
     public void switchToSession(boolean forward) {
@@ -484,39 +489,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                 }
             }
 
-            if (mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE).getBoolean("light_mode", false)) {
-                props.setProperty("background", "#ffffff");
-                props.setProperty("foreground", "#1e1e1e");
-                props.setProperty("cursor", "#000000");
-                String[] readableAnsiColors = {
-                    "#000000", "#9c0000", "#006600", "#745400", "#0050a4", "#800080", "#006a70", "#202124",
-                    "#5f6368", "#c00000", "#008000", "#806000", "#175bca", "#a000a0", "#007c80", "#000000"
-                };
-                for (int i = 0; i < readableAnsiColors.length; i++)
-                    props.setProperty("color" + i, readableAnsiColors[i]);
-            }
-
             TerminalColors.COLOR_SCHEME.updateWith(props);
-            if (mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE).getBoolean("light_mode", false)) {
-                int[] colors = TerminalColors.COLOR_SCHEME.mDefaultColors;
-                for (int i = 16; i < 256; i++) {
-                    int color = colors[i];
-                    int brightness = TerminalColors.getPerceivedBrightnessOfColor(color);
-                    if (brightness > 120) {
-                        float scale = 120f / brightness;
-                        colors[i] = 0xff000000
-                            | ((int)(((color >> 16) & 0xff) * scale) << 16)
-                            | ((int)(((color >> 8) & 0xff) * scale) << 8)
-                            | (int)((color & 0xff) * scale);
-                    }
-                }
-            }
             TerminalSession session = mActivity.getCurrentSession();
             if (session != null && session.getEmulator() != null) {
                 session.getEmulator().mColors.reset();
             }
             updateBackgroundColor();
-            if (mActivity.getTerminalView() != null) mActivity.getTerminalView().onScreenUpdated();
 
             final Typeface newTypeface = (fontFile.exists() && fontFile.length() > 0) ? Typeface.createFromFile(fontFile) : Typeface.MONOSPACE;
             mActivity.getTerminalView().setTypeface(newTypeface);
