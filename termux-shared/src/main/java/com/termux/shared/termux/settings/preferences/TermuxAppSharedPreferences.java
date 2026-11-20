@@ -132,8 +132,8 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         sizes[1] = (int) (4f * dipInPixels); // min
 
         // http://www.google.com/design/spec/style/typography.html#typography-line-height
-        // Visually match the 11sp macOS-style session title in activity_termux.xml.
-        int defaultFontSize = Math.round(8f * dipInPixels);
+        // Set the default terminal font size to 9dp.
+        int defaultFontSize = Math.round(9f * dipInPixels);
         // Make it divisible by 2 since that is the minimal adjustment step:
         if (defaultFontSize % 2 == 1) defaultFontSize--;
 
