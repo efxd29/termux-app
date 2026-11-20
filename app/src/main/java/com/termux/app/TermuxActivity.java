@@ -304,20 +304,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
+        // The three macOS-style title-bar dots are decorative only.
         setupDoubleTapExtraKeysToggle();
-        findViewById(R.id.macos_close).setOnClickListener(v -> {
-            if (isCurrentSessionInTmux()) sendTmuxPrefixCommand((byte) 'x');
-            else {
-                TerminalSession session = getCurrentSession();
-                if (session != null) session.finishIfRunning();
-            }
-        });
-        findViewById(R.id.macos_minimize).setOnClickListener(v -> {
-            toggleKeepScreenOn();
-        });
-        findViewById(R.id.macos_zoom).setOnClickListener(v -> {
-            onBackPressed();
-        });
         updateMacTitleBar();
         setupSessionDrawerEffects();
     }
@@ -353,6 +341,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             long now = SystemClock.uptimeMillis();
             float endDx = event.getX() - downX[0], endDy = event.getY() - downY[0];
             float touchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+
+            // Restore the left-edge swipe gesture for opening the session drawer.
+            float edgeWidth = 32f * getResources().getDisplayMetrics().density;
+            float swipeThreshold = 48f * getResources().getDisplayMetrics().density;
+            if (downX[0] <= edgeWidth && endDx >= swipeThreshold &&
+                Math.abs(endDy) < swipeThreshold) {
+                tapCount[0] = 0;
+                getDrawer().openDrawer(Gravity.LEFT);
+                return false;
+            }
+
             if (moved[0] || endDx * endDx + endDy * endDy > touchSlop * touchSlop || now - downTime[0] > 300L) {
                 tapCount[0] = 0;
                 return false;
