@@ -46,6 +46,11 @@ public class TerminalToolbarViewPager {
                 ExtraKeysView extraKeysView = (ExtraKeysView) layout;
                 extraKeysView.setExtraKeysViewClient(mActivity.getTermuxTerminalExtraKeys());
                 extraKeysView.setButtonTextAllCaps(mActivity.getProperties().shouldExtraKeysTextBeAllCaps());
+                boolean lightTerminal = mActivity.getSharedPreferences("terminal_ui", android.content.Context.MODE_PRIVATE)
+                    .getBoolean("light_mode", false);
+                extraKeysView.setButtonTextColor(lightTerminal ? android.graphics.Color.BLACK : android.graphics.Color.WHITE);
+                extraKeysView.setButtonActiveTextColor(lightTerminal
+                    ? android.graphics.Color.rgb(160, 105, 0) : android.graphics.Color.parseColor("#febc2e"));
                 mActivity.setExtraKeysView(extraKeysView);
                 extraKeysView.reload(mActivity.getTermuxTerminalExtraKeys().getExtraKeysInfo(),
                     mActivity.getTerminalToolbarDefaultHeight());
