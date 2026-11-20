@@ -298,6 +298,12 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
             notifyOfSessionChange();
         }
 
+        // Reapply the shared ANSI palette when returning to an existing session.
+        if (session.getEmulator() != null) {
+            session.getEmulator().mColors.reset();
+            mActivity.getTerminalView().onScreenUpdated();
+        }
+
         // We call the following even when the session is already being displayed since config may
         // be stale, like current session not selected or scrolled to.
         checkAndScrollToSession(session);
