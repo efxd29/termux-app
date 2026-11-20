@@ -398,6 +398,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private void setupSessionDrawerEffects() {
         DrawerLayout drawer = getDrawer();
         View sessionDrawer = findViewById(R.id.left_drawer);
+        // The drawer is opened only by the Sessions title-bar button.
+        // Lock the actual START-gravity drawer view so edge swipes cannot reveal it.
+        drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, sessionDrawer);
+        drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, Gravity.START);
         drawer.setDrawerLockMode(DrawerLayout.LOCK_MODE_LOCKED_CLOSED, Gravity.LEFT);
         drawer.setScrimColor(Color.TRANSPARENT);
         sessionDrawer.setBackgroundColor(Color.TRANSPARENT);
