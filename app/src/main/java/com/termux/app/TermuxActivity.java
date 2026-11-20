@@ -191,15 +191,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private float mTerminalToolbarDefaultHeight;
     private Integer mZoomFontSizeBeforeMacZoom;
 
-    private final Handler mTitleBarHandler = new Handler(Looper.getMainLooper());
-    private final Runnable mTitleBarUpdater = new Runnable() {
-        @Override public void run() {
-            updateMacTitleBar();
-            mTitleBarHandler.postDelayed(this, 1000);
-        }
-    };
-
-
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
     private static final int CONTEXT_MENU_SHARE_TRANSCRIPT_ID = 1;
     private static final int CONTEXT_MENU_SHARE_SELECTED_TEXT = 10;
@@ -304,9 +295,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setupMacTitleBar() {
-        // The three macOS-style title-bar dots are decorative only.
+        // Keep the title-bar controls purely decorative.
         setupDoubleTapExtraKeysToggle();
-        updateMacTitleBar();
         setupSessionDrawerEffects();
     }
 
@@ -440,33 +430,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
     }
 
-    private void updateMacTitleBar() {
-        TextView titleView = findViewById(R.id.macos_title);
-        if (titleView == null) return;
-        TerminalSession session = getCurrentSession();
-        String folder = "Termux";
-        String shell = "-zsh";
-        String size = "--x--";
-        if (session != null) {
-            String terminalTitle = session.getTitle();
-            if (terminalTitle != null && !terminalTitle.trim().isEmpty()) {
-                String[] titleParts = terminalTitle.trim().split("\\|", -1);
-                if (titleParts.length >= 2) shell = "-" + titleParts[0];
-                String cwd = titleParts.length >= 2 ? titleParts[1] : titleParts[0];
-                if (titleParts.length >= 3 && "tmux".equals(titleParts[2])) shell = "-" + titleParts[0] + " (tmux)";
-                if (cwd.startsWith("@Termux ")) cwd = cwd.substring("@Termux ".length());
-                int slash = cwd.lastIndexOf('/');
-                folder = slash >= 0 && slash + 1 < cwd.length() ? cwd.substring(slash + 1) : cwd;
-                if ("/".equals(cwd)) folder = "/";
-                if ("~".equals(cwd) || cwd.endsWith("/home")) folder = "Termux";
-            }
-            if (session.getEmulator() != null)
-                size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
-        }
-        titleView.setText(folder + " — " + shell + " — " + size);
-        titleView.setSelected(true);
-    }
-
     @Override
     public void onStart() {
         super.onStart();
@@ -484,8 +447,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mTermuxTerminalSessionActivityClient != null) mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
 
         mIsVisible = true;
-        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
-        mTitleBarHandler.post(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -567,7 +528,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = false;
-        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -584,7 +544,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     @Override
     public void onDestroy() {
         super.onDestroy();
-        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         Logger.logDebug(LOG_TAG, "onDestroy");
 
@@ -628,6 +587,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mTermuxService = ((TermuxService.LocalBinder) service).service;
 
         setTermuxSessionsListView();
+        removeCustomShellPrompt();
 
         final Intent intent = getIntent();
         setIntent(null);
@@ -669,24 +629,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
     }
 
-    /** Apply the bundled first-run shell look without overwriting the user's existing dotfiles. */
+    /** Preserve the existing Termux color setup without injecting a custom shell identity. */
     private void installTerminalDefaults() {
         File home = new File(getFilesDir(), "home");
         if (!home.exists() && !home.mkdirs()) return;
         File termuxConfig = new File(home, ".termux");
         if (!termuxConfig.exists() && !termuxConfig.mkdirs()) return;
-        copyAssetIfAbsent("macos-shell.sh", new File(termuxConfig, "macos-shell.sh"));
         copyAssetIfAbsent("colors.properties", new File(termuxConfig, "colors.properties"));
-        appendShellConfig(new File(home, ".bash_profile"));
-        appendShellConfig(new File(home, ".bashrc"));
-        appendShellConfig(new File(home, ".zshrc"));
-
-        // The welcome text is the bootstrap MOTD; blank it after bootstrap and before the first shell.
-        File motd = new File(new File(getFilesDir(), "usr/etc"), "motd");
-        if (motd.isFile()) {
-            try (FileOutputStream out = new FileOutputStream(motd, false)) { out.write(new byte[0]); }
-            catch (Exception e) { Logger.logStackTraceWithMessage(LOG_TAG, "Could not clear Termux MOTD", e); }
-        }
     }
 
     private void copyAssetIfAbsent(String asset, File target) {
@@ -700,30 +649,46 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
 
-    private void appendShellConfig(File target) {
-        final String marker = "# Termux macOS-style prompt";
-        if (target.isFile()) {
-            try {
-                String current;
-                try (FileInputStream in = new FileInputStream(target); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
-                    byte[] buffer = new byte[4096];
-                    int count;
-                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
-                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+    /** Remove only the shell prompt lines injected by an older custom build. */
+    private void removeCustomShellPrompt() {
+        File home = new File(getFilesDir(), "home");
+        String[] shellFiles = {".bash_profile", ".bashrc", ".zshrc"};
+        for (String fileName : shellFiles) {
+            File target = new File(home, fileName);
+            if (!target.isFile()) continue;
+            try (FileInputStream in = new FileInputStream(target);
+                 ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                String original = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+                StringBuilder cleaned = new StringBuilder();
+                boolean removePromptSource = false;
+                for (String line : original.split("(?<=\\n)", -1)) {
+                    String trimmed = line.trim();
+                    if (trimmed.equals("# Termux macOS-style prompt")) {
+                        removePromptSource = true;
+                        continue;
+                    }
+                    if (removePromptSource && trimmed.contains(".termux/macos-shell.sh")) {
+                        removePromptSource = false;
+                        continue;
+                    }
+                    removePromptSource = false;
+                    cleaned.append(line);
                 }
-                if (current.contains(marker)) return;
-                try (FileOutputStream out = new FileOutputStream(target, true)) {
-                    out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+                if (!original.equals(cleaned.toString())) {
+                    try (FileOutputStream out = new FileOutputStream(target, false)) {
+                        out.write(cleaned.toString().getBytes(StandardCharsets.UTF_8));
+                    }
                 }
             } catch (Exception e) {
-                Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure shell prompt in " + target.getName(), e);
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not restore the default Termux shell prompt in " + fileName, e);
             }
-        } else {
-            try (FileOutputStream out = new FileOutputStream(target)) {
-                out.write((marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
-            } catch (Exception e) {
-                Logger.logStackTraceWithMessage(LOG_TAG, "Could not create " + target.getName(), e);
-            }
+        }
+        File customPrompt = new File(new File(home, ".termux"), "macos-shell.sh");
+        if (customPrompt.isFile() && !customPrompt.delete()) {
+            Logger.logError(LOG_TAG, "Could not remove the old custom shell prompt script");
         }
     }
 
