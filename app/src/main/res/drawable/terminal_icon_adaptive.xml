@@ -1,13 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Scale up the unchanged original artwork so it fills the adaptive icon mask.
-         The original terminal_icon.png is reused unchanged. -->
-    <item
-        android:width="216dp"
-        android:height="216dp"
-        android:gravity="center">
-        <bitmap
-            android:src="@drawable/terminal_icon"
-            android:gravity="fill" />
+    <!-- Keep the original Termux artwork, scaled up to remove the excess inset
+         imposed by the adaptive-icon safe zone. The source PNG is unchanged. -->
+    <item>
+        <scale
+            android:drawable="@drawable/terminal_icon"
+            android:scaleGravity="center"
+            android:scaleHeight="150%"
+            android:scaleWidth="150%" />
     </item>
 </layer-list>
