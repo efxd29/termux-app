@@ -9,9 +9,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.ServiceConnection;
+import android.graphics.Color;
+import android.graphics.RenderEffect;
+import android.graphics.Shader;
+import android.os.Build;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.os.Handler;
+import android.os.Looper;
+import android.os.SystemClock;
 import android.view.ContextMenu;
 import android.view.ContextMenu.ContextMenuInfo;
 import android.view.Gravity;
@@ -25,6 +32,14 @@ import android.widget.ImageButton;
 import android.widget.ListView;
 import android.widget.RelativeLayout;
 import android.widget.Toast;
+import android.widget.TextView;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStream;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
 
 import com.termux.R;
 import com.termux.app.api.file.FileReceiverActivity;
@@ -174,6 +189,15 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     private int mNavBarHeight;
 
     private float mTerminalToolbarDefaultHeight;
+    private Integer mZoomFontSizeBeforeMacZoom;
+
+    private final Handler mTitleBarHandler = new Handler(Looper.getMainLooper());
+    private final Runnable mTitleBarUpdater = new Runnable() {
+        @Override public void run() {
+            updateMacTitleBar();
+            mTitleBarHandler.postDelayed(this, 1000);
+        }
+    };
 
 
     private static final int CONTEXT_MENU_SELECT_URL_ID = 0;
@@ -214,6 +238,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         super.onCreate(savedInstanceState);
 
         setContentView(R.layout.activity_termux);
+        installBundledFontIfMissing();
 
         // Load termux shared preferences
         // This will also fail if TermuxConstants.TERMUX_PACKAGE_NAME does not equal applicationId
@@ -237,19 +262,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return insets;
         });
 
-        if (mProperties.isUsingFullScreen()) {
-            getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        }
-
         setTermuxTerminalViewAndClients();
 
         setTerminalToolbarView(savedInstanceState);
+        setupMacTitleBar();
 
         setSettingsButtonView();
 
         setNewSessionButtonView();
-
-        setToggleKeyboardView();
 
         registerForContextMenu(mTerminalView);
 
@@ -259,6 +279,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             // Start the {@link TermuxService} and make it run regardless of who is bound to it
             Intent serviceIntent = new Intent(this, TermuxService.class);
             startService(serviceIntent);
+            if (getSharedPreferences("terminal_ui", MODE_PRIVATE).getBoolean("wake_lock_active", false)) {
+                startService(new Intent(this, TermuxService.class)
+                    .setAction(TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_LOCK));
+            }
 
             // Attempt to bind to the service, this will call the {@link #onServiceConnected(ComponentName, IBinder)}
             // callback if it succeeds.
@@ -279,6 +303,170 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         TermuxUtils.sendTermuxOpenedBroadcast(this);
     }
 
+    private void setupMacTitleBar() {
+        // The three macOS-style title-bar dots are decorative only.
+        setupDoubleTapExtraKeysToggle();
+        updateMacTitleBar();
+        setupSessionDrawerEffects();
+    }
+
+    /** Two successive single-finger taps toggle Termux's extra-keys area. */
+    private void setupDoubleTapExtraKeysToggle() {
+        final long[] lastTapTime = {0L};
+        final float[] lastTapX = {0f};
+        final float[] lastTapY = {0f};
+        final float[] downX = {0f};
+        final float[] downY = {0f};
+        final long[] downTime = {0L};
+        final boolean[] moved = {false};
+        final int[] tapCount = {0};
+        final boolean[] multiTouchTap = {false};
+        final float tapSlop = 48f * getResources().getDisplayMetrics().density;
+        mTerminalView.setOnTouchListener((view, event) -> {
+            int action = event.getActionMasked();
+            if (action == android.view.MotionEvent.ACTION_DOWN) {
+                downX[0] = event.getX(); downY[0] = event.getY();
+                downTime[0] = SystemClock.uptimeMillis(); moved[0] = false;
+            } else if (action == android.view.MotionEvent.ACTION_MOVE) {
+                float dx = event.getX() - downX[0], dy = event.getY() - downY[0];
+                float slop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+                if (dx * dx + dy * dy > slop * slop) moved[0] = true;
+            } else if (action == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
+            if (action == android.view.MotionEvent.ACTION_CANCEL) {
+                tapCount[0] = 0;
+                multiTouchTap[0] = false;
+                return false;
+            }
+            if (action != android.view.MotionEvent.ACTION_UP) return false;
+            long now = SystemClock.uptimeMillis();
+            float endDx = event.getX() - downX[0], endDy = event.getY() - downY[0];
+            float touchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+
+            // Restore the left-edge swipe gesture for opening the session drawer.
+            float edgeWidth = 32f * getResources().getDisplayMetrics().density;
+            float swipeThreshold = 48f * getResources().getDisplayMetrics().density;
+            if (downX[0] <= edgeWidth && endDx >= swipeThreshold &&
+                Math.abs(endDy) < swipeThreshold) {
+                tapCount[0] = 0;
+                getDrawer().openDrawer(Gravity.LEFT);
+                return false;
+            }
+
+            if (moved[0] || endDx * endDx + endDy * endDy > touchSlop * touchSlop || now - downTime[0] > 300L) {
+                tapCount[0] = 0;
+                return false;
+            }
+            if (multiTouchTap[0]) {
+                tapCount[0] = 0;
+                multiTouchTap[0] = false;
+                return false;
+            }
+            float dx = event.getX() - lastTapX[0];
+            float dy = event.getY() - lastTapY[0];
+            if (now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
+                tapCount[0]++;
+            } else {
+                tapCount[0] = 1;
+            }
+            lastTapTime[0] = now;
+            lastTapX[0] = event.getX();
+            lastTapY[0] = event.getY();
+            if (tapCount[0] == 2) {
+                toggleTerminalToolbar();
+                tapCount[0] = 0;
+            }
+            return false;
+        });
+    }
+
+    private void setupSessionDrawerEffects() {
+        DrawerLayout drawer = getDrawer();
+        View sessionDrawer = findViewById(R.id.left_drawer);
+        drawer.setScrimColor(Color.TRANSPARENT);
+        sessionDrawer.setBackgroundColor(Color.TRANSPARENT);
+        drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+            @Override public void onDrawerSlide(@NonNull View drawerView, float slideOffset) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    float radius = 22f * Math.max(0f, Math.min(1f, slideOffset));
+                    mTerminalView.setRenderEffect(radius > 0f
+                        ? RenderEffect.createBlurEffect(radius, radius, Shader.TileMode.CLAMP) : null);
+                }
+            }
+            @Override public void onDrawerClosed(@NonNull View drawerView) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) mTerminalView.setRenderEffect(null);
+            }
+        });
+    }
+
+    private void installBundledFontIfMissing() {
+        File font = TermuxConstants.TERMUX_FONT_FILE;
+        if (font.isFile() && font.length() > 0) return;
+        try {
+            File parent = font.getParentFile();
+            if (parent != null && !parent.exists() && !parent.mkdirs()) return;
+            try (InputStream in = getAssets().open("SFMonoRegular.otf");
+                 FileOutputStream out = new FileOutputStream(font)) {
+                byte[] buffer = new byte[8192];
+                int count;
+                while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+            }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not install bundled SF Mono font", e);
+        }
+    }
+
+    /** Send the standard tmux prefix (Ctrl-B) followed by its default key binding. */
+    private void sendTmuxPrefixCommand(byte key) {
+        TerminalSession session = getCurrentSession();
+        if (session == null || !session.isRunning()) return;
+        session.write(new byte[] { 2, key }, 0, 2);
+    }
+
+    private boolean isCurrentSessionInTmux() {
+        TerminalSession session = getCurrentSession();
+        String title = session == null ? null : session.getTitle();
+        return title != null && title.endsWith("|tmux");
+    }
+
+    private void toggleMacZoom() {
+        if (mZoomFontSizeBeforeMacZoom == null) {
+            mZoomFontSizeBeforeMacZoom = mPreferences.getFontSize();
+            mPreferences.setFontSize(Math.min(256, mZoomFontSizeBeforeMacZoom + 2));
+        } else {
+            mPreferences.setFontSize(mZoomFontSizeBeforeMacZoom);
+            mZoomFontSizeBeforeMacZoom = null;
+        }
+        if (mTermuxTerminalSessionActivityClient != null)
+            mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
+    }
+
+    private void updateMacTitleBar() {
+        TextView titleView = findViewById(R.id.macos_title);
+        if (titleView == null) return;
+        TerminalSession session = getCurrentSession();
+        String folder = "Termux";
+        String shell = "-zsh";
+        String size = "--x--";
+        if (session != null) {
+            String terminalTitle = session.getTitle();
+            if (terminalTitle != null && !terminalTitle.trim().isEmpty()) {
+                String[] titleParts = terminalTitle.trim().split("\\|", -1);
+                if (titleParts.length >= 2) shell = "-" + titleParts[0];
+                String cwd = titleParts.length >= 2 ? titleParts[1] : titleParts[0];
+                if (titleParts.length >= 3 && "tmux".equals(titleParts[2])) shell = "-" + titleParts[0] + " (tmux)";
+                if (cwd.startsWith( "Termux ")) cwd = cwd.substring( "Termux ".length());
+                int slash = cwd.lastIndexOf('/');
+                folder = slash >= 0 && slash + 1 < cwd.length() ? cwd.substring(slash + 1) : cwd;
+                if ("/".equals(cwd)) folder = "/";
+                if ("~".equals(cwd) || cwd.endsWith("/home")) folder = "Termux";
+            }
+            if (session.getEmulator() != null)
+                size = session.getEmulator().mColumns + "x" + session.getEmulator().mRows;
+        }
+        titleView.setText(folder + " — " + shell + " — " + size);
+        titleView.setSelected(true);
+    }
+
     @Override
     public void onStart() {
         super.onStart();
@@ -287,7 +475,17 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         if (mIsInvalidState) return;
 
+        applyMacUiMode();
+        if (mTermuxTerminalExtraKeys != null) {
+            mTermuxTerminalExtraKeys.reloadCustomExtraKeys();
+            if (mExtraKeysView != null) mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
+            setTerminalToolbarHeight();
+        }
+        if (mTermuxTerminalSessionActivityClient != null) mTermuxTerminalSessionActivityClient.onReloadActivityStyling();
+
         mIsVisible = true;
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
+        mTitleBarHandler.post(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStart();
@@ -299,6 +497,44 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             addTermuxActivityRootViewGlobalLayoutListener();
 
         registerTermuxActivityBroadcastReceiver();
+    }
+
+    private void applyMacUiMode() {
+        android.content.SharedPreferences ui = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        boolean light = ui.getBoolean("light_mode", false);
+        boolean showStatusBar = ui.getBoolean("show_status_bar", true);
+        if (mPreferences != null && mPreferences.shouldKeepScreenOn()) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        View bar = findViewById(R.id.macos_title_bar);
+        TextView title = findViewById(R.id.macos_title);
+        if (bar != null) bar.setBackgroundColor(Color.parseColor(light ? "#f1f1f1" : "#35353a"));
+        if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
+        ImageButton settings = findViewById(R.id.settings_button);
+        if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
+        View drawer = findViewById(R.id.left_drawer);
+        if (drawer != null) drawer.setBackgroundColor(light ? Color.WHITE : Color.rgb(34, 34, 36));
+        View newSession = findViewById(R.id.new_session_button);
+        if (newSession instanceof com.google.android.material.button.MaterialButton) {
+            ((com.google.android.material.button.MaterialButton) newSession).setTextColor(Color.parseColor(light ? "#202124" : "#ffffff"));
+            ((com.google.android.material.button.MaterialButton) newSession).setBackgroundTintList(android.content.res.ColorStateList.valueOf(light ? Color.rgb(232, 232, 235) : Color.rgb(60, 60, 64)));
+        }
+        if (mTermuxSessionListViewController != null) mTermuxSessionListViewController.notifyDataSetChanged();
+        if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            View decor = getWindow().getDecorView();
+            int systemUi = decor.getSystemUiVisibility();
+            systemUi = light ? systemUi | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR : systemUi & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR;
+            decor.setSystemUiVisibility(systemUi);
+        }
+        if (mExtraKeysView != null) {
+            mExtraKeysView.setButtonColors(light ? Color.parseColor("#202124") : Color.WHITE,
+                Color.parseColor("#febc2e"), Color.TRANSPARENT, Color.TRANSPARENT);
+            if (mTermuxTerminalExtraKeys != null) {
+                mTermuxTerminalExtraKeys.reloadCustomExtraKeys();
+                mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
+            }
+        }
     }
 
     @Override
@@ -331,6 +567,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (mIsInvalidState) return;
 
         mIsVisible = false;
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         if (mTermuxTerminalSessionActivityClient != null)
             mTermuxTerminalSessionActivityClient.onStop();
@@ -347,6 +584,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     @Override
     public void onDestroy() {
         super.onDestroy();
+        mTitleBarHandler.removeCallbacks(mTitleBarUpdater);
 
         Logger.logDebug(LOG_TAG, "onDestroy");
 
@@ -399,6 +637,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 TermuxInstaller.setupBootstrapIfNeeded(TermuxActivity.this, () -> {
                     if (mTermuxService == null) return; // Activity might have been destroyed.
                     try {
+                        installTerminalDefaults();
                         boolean launchFailsafe = false;
                         if (intent != null && intent.getExtras() != null) {
                             launchFailsafe = intent.getExtras().getBoolean(TERMUX_ACTIVITY.EXTRA_FAILSAFE_SESSION, false);
@@ -413,6 +652,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 finishActivityIfNotFinishing();
             }
         } else {
+            installTerminalDefaults();
             // If termux was started from launcher "New session" shortcut and activity is recreated,
             // then the original intent will be re-delivered, resulting in a new session being re-added
             // each time.
@@ -427,6 +667,64 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         // Update the {@link TerminalSession} and {@link TerminalEmulator} clients.
         mTermuxService.setTermuxTerminalSessionClient(mTermuxTerminalSessionActivityClient);
+    }
+
+    /** Apply the bundled first-run shell look without overwriting the user's existing dotfiles. */
+    private void installTerminalDefaults() {
+        File home = new File(getFilesDir(), "home");
+        if (!home.exists() && !home.mkdirs()) return;
+        File termuxConfig = new File(home, ".termux");
+        if (!termuxConfig.exists() && !termuxConfig.mkdirs()) return;
+        copyAssetIfAbsent("macos-shell.sh", new File(termuxConfig, "macos-shell.sh"));
+        copyAssetIfAbsent("colors.properties", new File(termuxConfig, "colors.properties"));
+        appendShellConfig(new File(home, ".bash_profile"));
+        appendShellConfig(new File(home, ".bashrc"));
+        appendShellConfig(new File(home, ".zshrc"));
+
+        // The welcome text is the bootstrap MOTD; blank it after bootstrap and before the first shell.
+        File motd = new File(new File(getFilesDir(), "usr/etc"), "motd");
+        if (motd.isFile()) {
+            try (FileOutputStream out = new FileOutputStream(motd, false)) { out.write(new byte[0]); }
+            catch (Exception e) { Logger.logStackTraceWithMessage(LOG_TAG, "Could not clear Termux MOTD", e); }
+        }
+    }
+
+    private void copyAssetIfAbsent(String asset, File target) {
+        if (target.exists()) return;
+        try (InputStream in = getAssets().open(asset); FileOutputStream out = new FileOutputStream(target)) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not install default " + asset, e);
+        }
+    }
+
+    private void appendShellConfig(File target) {
+        final String marker = "# Termux macOS-style prompt";
+        if (target.isFile()) {
+            try {
+                String current;
+                try (FileInputStream in = new FileInputStream(target); ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+                }
+                if (current.contains(marker)) return;
+                try (FileOutputStream out = new FileOutputStream(target, true)) {
+                    out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+                }
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure shell prompt in " + target.getName(), e);
+            }
+        } else {
+            try (FileOutputStream out = new FileOutputStream(target)) {
+                out.write((marker + "\n[ -r \"$HOME/.termux/macos-shell.sh\" ] && . \"$HOME/.termux/macos-shell.sh\"\n").getBytes(StandardCharsets.UTF_8));
+            } catch (Exception e) {
+                Logger.logStackTraceWithMessage(LOG_TAG, "Could not create " + target.getName(), e);
+            }
+        }
     }
 
     @Override
@@ -512,7 +810,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             mTermuxTerminalViewClient, mTermuxTerminalSessionActivityClient);
 
         final ViewPager terminalToolbarViewPager = getTerminalToolbarViewPager();
-        if (mPreferences.shouldShowTerminalToolbar()) terminalToolbarViewPager.setVisibility(View.VISIBLE);
+        android.content.SharedPreferences uiPrefs = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        if (!uiPrefs.getBoolean("extra_keys_default_migrated", false)) {
+            if (mPreferences.shouldShowTerminalToolbar()) mPreferences.toogleShowTerminalToolbar();
+            uiPrefs.edit().putBoolean("extra_keys_default_migrated", true).apply();
+        }
+        terminalToolbarViewPager.setVisibility(mPreferences.shouldShowTerminalToolbar() ? View.VISIBLE : View.GONE);
 
         ViewGroup.LayoutParams layoutParams = terminalToolbarViewPager.getLayoutParams();
         mTerminalToolbarDefaultHeight = layoutParams.height;
@@ -543,7 +846,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (terminalToolbarViewPager == null) return;
 
         final boolean showNow = mPreferences.toogleShowTerminalToolbar();
-        Logger.showToast(this, (showNow ? getString(R.string.msg_enabling_terminal_toolbar) : getString(R.string.msg_disabling_terminal_toolbar)), true);
         terminalToolbarViewPager.setVisibility(showNow ? View.VISIBLE : View.GONE);
         if (showNow && isTerminalToolbarTextInputViewSelected()) {
             // Focus the text input view if just revealed.
@@ -581,22 +883,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return true;
         });
     }
-
-    private void setToggleKeyboardView() {
-        findViewById(R.id.toggle_keyboard_button).setOnClickListener(v -> {
-            mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
-            getDrawer().closeDrawers();
-        });
-
-        findViewById(R.id.toggle_keyboard_button).setOnLongClickListener(v -> {
-            toggleTerminalToolbar();
-            return true;
-        });
-    }
-
-
-
-
 
     @SuppressLint("RtlHardcoded")
     @Override
@@ -749,13 +1035,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
     private void toggleKeepScreenOn() {
-        if (mTerminalView.getKeepScreenOn()) {
-            mTerminalView.setKeepScreenOn(false);
-            mPreferences.setKeepScreenOn(false);
-        } else {
-            mTerminalView.setKeepScreenOn(true);
-            mPreferences.setKeepScreenOn(true);
-        }
+        android.content.SharedPreferences ui = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        boolean enableWakeLock = !ui.getBoolean("wake_lock_active", false);
+        ui.edit().putBoolean("wake_lock_active", enableWakeLock).apply();
+        String action = enableWakeLock
+            ? TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_LOCK
+            : TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_UNLOCK;
+        startService(new Intent(this, TermuxService.class).setAction(action));
     }
 
 
