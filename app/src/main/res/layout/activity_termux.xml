@@ -7,53 +7,6 @@
     android:orientation="vertical"
     android:fitsSystemWindows="true">
 
-    <LinearLayout
-        android:id="@+id/macos_title_bar"
-        android:layout_width="match_parent"
-        android:layout_height="28dp"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:paddingStart="3.3dp"
-        android:paddingEnd="3.3dp"
-        android:background="#35353a">
-
-        <TextView android:id="@+id/macos_close" style="@style/MacTitleDot" android:text="●" android:textColor="#fe5e56" android:contentDescription="Quit session" android:clickable="false" android:focusable="false" />
-        <TextView android:id="@+id/macos_minimize" style="@style/MacTitleDot" android:text="●" android:textColor="#febc2e" android:contentDescription="Toggle wake lock" android:clickable="false" android:focusable="false" />
-        <TextView android:id="@+id/macos_zoom" style="@style/MacTitleDot" android:text="●" android:textColor="#28c840" android:contentDescription="Back" android:clickable="false" android:focusable="false" />
-
-        <LinearLayout
-            android:layout_width="0dp"
-            android:layout_height="match_parent"
-            android:layout_weight="1"
-            android:gravity="center"
-            android:orientation="horizontal">
-            <ImageView
-                android:id="@+id/macos_home_icon"
-                android:layout_width="14dp"
-                android:layout_height="14dp"
-                android:contentDescription="Home folder"
-                android:scaleType="fitCenter"
-                android:src="@drawable/macos_home_folder" />
-            <TextView
-                android:id="@+id/macos_title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginStart="8dp"
-                android:ellipsize="marquee"
-                android:marqueeRepeatLimit="marquee_forever"
-                android:maxWidth="240dp"
-                android:maxLines="1"
-                android:scrollHorizontally="true"
-                android:singleLine="true"
-                android:text="efxd29 — -zsh — 45x50"
-                android:textColor="#a0a0a8"
-                android:textSize="11sp"
-                android:textStyle="bold" />
-        </LinearLayout>
-
-        <Space android:layout_width="60dp" android:layout_height="1dp" />
-    </LinearLayout>
-
     <RelativeLayout
         android:id="@+id/activity_termux_root_relative_layout"
         android:layout_width="match_parent"
@@ -90,7 +43,7 @@
                 android:dividerHeight="0dp"
                 android:descendantFocusability="blocksDescendants"
                 android:orientation="vertical"
-            android:background="#991e1e1e">
+                android:background="?attr/termuxActivityDrawerBackground">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -120,12 +73,22 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/toggle_keyboard_button"
+                        style="?android:attr/buttonBarButtonStyle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="@string/action_toggle_soft_keyboard" />
+
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/new_session_button"
                         style="?android:attr/buttonBarButtonStyle"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
-                        android:text="Sesi baru" />
+                        android:layout_weight="1"
+                        android:text="@string/action_new_session" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -136,7 +99,7 @@
             android:visibility="gone"
             android:layout_width="match_parent"
             android:layout_height="37.5dp"
-            android:background="@android:color/transparent"
+            android:background="@color/black"
             android:layout_alignParentBottom="true" />
 
     </RelativeLayout>
