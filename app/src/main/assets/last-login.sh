@@ -22,7 +22,7 @@ if [ -r "$_termux_last_login_file" ] && [ ! -e "$HOME/.hushlogin" ]; then
     case "$_termux_previous_tty" in
         pts/[0-9]*)
             if [ -n "$_termux_previous_time" ]; then
-                printf 'Last login: %s on %s\\n' "$_termux_previous_time" "$_termux_previous_tty"
+                printf 'Last login: %s on %s\n' "$_termux_previous_time" "$_termux_previous_tty"
             fi
             ;;
     esac
