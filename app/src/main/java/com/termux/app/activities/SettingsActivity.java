@@ -50,6 +50,17 @@ public class SettingsActivity extends AppCompatActivity {
 
         AppCompatActivityUtils.setToolbar(this, com.termux.shared.R.id.toolbar);
         AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(com.termux.shared.R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setBackgroundColor(android.graphics.Color.rgb(53, 53, 58));
+            toolbar.setTitleTextColor(android.graphics.Color.rgb(238, 238, 242));
+            if (toolbar.getNavigationIcon() != null) toolbar.getNavigationIcon().setTint(android.graphics.Color.WHITE);
+        }
+        getWindow().setStatusBarColor(android.graphics.Color.rgb(38, 38, 41));
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                getWindow().getDecorView().getSystemUiVisibility() & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
     }
 
     @Override

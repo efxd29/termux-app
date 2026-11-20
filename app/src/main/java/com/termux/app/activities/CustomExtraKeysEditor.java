@@ -27,12 +27,12 @@ import java.util.List;
 /** Visual editor for Termux's extra-key rows. */
 public final class CustomExtraKeysEditor {
     private static final String[][] PALETTE = {
-        {"ESC", "TAB", "CTRL", "ALT", "SHIFT", "FN", "HOME", "END"},
-        {"/", "-", "UP", "DOWN", "LEFT", "RIGHT", "PGUP", "PGDN"},
-        {"KEYBOARD", "DRAWER", "PASTE", "SCROLL", "ENTER", "BACKSPACE", "DEL", "INS"},
-        {"Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P"},
-        {"A", "S", "D", "F", "G", "H", "J", "K", "L"},
-        {"Z", "X", "C", "V", "B", "N", "M", "SPACE"}
+        {"ESC", "F1", "F2", "F3", "F4", "F5", "F6", "F7", "F8", "F9", "F10", "F11", "F12"},
+        {"`", "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "BKSP", "HOME"},
+        {"TAB", "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "[", "]", "\\", "PGUP"},
+        {"CAPS", "A", "S", "D", "F", "G", "H", "J", "K", "L", ";", "'", "ENTER", "PGDN"},
+        {"SHIFT", "Z", "X", "C", "V", "B", "N", "M", ",", ".", "/", "SHIFT", "END"},
+        {"CTRL", "FN", "ALT", "SPACE", "ALT", "CTRL", "LEFT", "DOWN", "UP", "RIGHT"}
     };
 
     public interface SaveListener { void onSave(String json); }
@@ -193,14 +193,95 @@ public final class CustomExtraKeysEditor {
     }
 
     private static void showKeyActions(Context context, ArrayList<ArrayList<String>> rows, int row, int index, Runnable render) {
-        String[] actions = {"Geser ke kiri", "Geser ke kanan", "Hapus"};
+        String[] actions = {"Ganti dengan tombol…", "Buat shortcut / macro…", "Geser ke kiri", "Geser ke kanan", "Hapus"};
         new AlertDialog.Builder(context).setTitle(displayItem(rows.get(row).get(index))).setItems(actions, (dialog, which) -> {
             ArrayList<String> keys = rows.get(row);
-            if (which == 0 && index > 0) { String value = keys.remove(index); keys.add(index - 1, value); }
-            else if (which == 1 && index < keys.size() - 1) { String value = keys.remove(index); keys.add(index + 1, value); }
-            else if (which == 2) keys.remove(index);
-            render.run();
+            if (which == 0) showKeyPicker(context, rows, row, index, false, render);
+            else if (which == 1) showKeyPicker(context, rows, row, index, true, render);
+            else if (which == 2 && index > 0) { String value = keys.remove(index); keys.add(index - 1, value); render.run(); }
+            else if (which == 3 && index < keys.size() - 1) { String value = keys.remove(index); keys.add(index + 1, value); render.run(); }
+            else if (which == 4) { keys.remove(index); render.run(); }
         }).show();
+    }
+
+    /** A full, scrollable desktop-keyboard picker for replacing a key or composing a macro. */
+    private static void showKeyPicker(Context context, ArrayList<ArrayList<String>> rows, int row, int index,
+                                      boolean macro, Runnable render) {
+        int dark = Color.rgb(54, 54, 57), keyColor = Color.rgb(76, 76, 81), selectedColor = Color.rgb(89, 113, 139);
+        int foreground = Color.rgb(242, 242, 246);
+        LinearLayout layout = new LinearLayout(context);
+        layout.setOrientation(LinearLayout.VERTICAL);
+        layout.setPadding(dp(context, 12), dp(context, 8), dp(context, 12), dp(context, 8));
+        ScrollView scroll = new ScrollView(context);
+        LinearLayout keyboard = new LinearLayout(context);
+        keyboard.setOrientation(LinearLayout.VERTICAL);
+        ArrayList<String> selected = new ArrayList<>();
+        for (String[] keyRow : PALETTE) {
+            HorizontalScrollView horizontal = new HorizontalScrollView(context);
+            horizontal.setHorizontalScrollBarEnabled(false);
+            LinearLayout line = new LinearLayout(context);
+            for (String value : keyRow) {
+                MaterialButton key = new MaterialButton(context);
+                key.setText(value);
+                key.setTextSize(11);
+                key.setTextColor(foreground);
+                key.setMinWidth(dp(context, 50)); key.setMinimumWidth(dp(context, 50));
+                key.setInsetTop(0); key.setInsetBottom(0);
+                key.setBackgroundTintList(android.content.res.ColorStateList.valueOf(keyColor));
+                key.setRippleColor(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(dp(context, 60), dp(context, 48));
+                params.setMargins(dp(context, 2), dp(context, 2), dp(context, 2), dp(context, 2));
+                key.setOnClickListener(v -> {
+                    if (!macro) {
+                        rows.get(row).set(index, value);
+                        render.run();
+                    } else if (selected.contains(value)) {
+                        selected.remove(value);
+                        key.setBackgroundTintList(android.content.res.ColorStateList.valueOf(keyColor));
+                    } else {
+                        selected.add(value);
+                        key.setBackgroundTintList(android.content.res.ColorStateList.valueOf(selectedColor));
+                    }
+                });
+                line.addView(key, params);
+            }
+            horizontal.addView(line);
+            keyboard.addView(horizontal);
+        }
+        scroll.addView(keyboard);
+        layout.addView(scroll, new LinearLayout.LayoutParams(-1, dp(context, 340)));
+        AlertDialog.Builder builder = new AlertDialog.Builder(context)
+            .setTitle(macro ? "Pilih urutan shortcut" : "Pilih tombol pengganti")
+            .setView(layout)
+            .setNegativeButton("Batal", null);
+        if (macro) {
+            EditText name = new EditText(context);
+            name.setSingleLine(true);
+            name.setTextColor(foreground);
+            name.setHintTextColor(Color.LTGRAY);
+            name.setHint("Nama tombol, misalnya Paste");
+            name.setBackgroundTintList(android.content.res.ColorStateList.valueOf(Color.LTGRAY));
+            layout.addView(name, new LinearLayout.LayoutParams(-1, dp(context, 56)));
+            builder.setMessage("Pilih beberapa tombol berurutan, misalnya CTRL lalu V.")
+                .setPositiveButton("Buat shortcut", (d, w) -> {
+                    if (selected.isEmpty()) return;
+                    String sequence = android.text.TextUtils.join(" ", selected);
+                    String label = name.getText().toString().trim();
+                    if (label.isEmpty()) label = sequence;
+                    try {
+                        JSONObject item = new JSONObject(); item.put("macro", sequence); item.put("display", label);
+                        rows.get(row).set(index, item.toString()); render.run();
+                    } catch (JSONException ignored) { }
+                });
+        }
+        AlertDialog picker = builder.create();
+        picker.setOnShowListener(d -> {
+            if (picker.getWindow() != null) picker.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
+            picker.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(foreground);
+            if (picker.getButton(AlertDialog.BUTTON_POSITIVE) != null) picker.getButton(AlertDialog.BUTTON_POSITIVE).setTextColor(foreground);
+            layout.setBackgroundColor(dark);
+        });
+        picker.show();
     }
 
     private static ArrayList<ArrayList<String>> parseRows(String source) {

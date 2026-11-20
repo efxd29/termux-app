@@ -271,8 +271,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setNewSessionButtonView();
 
-        setToggleKeyboardView();
-
         registerForContextMenu(mTerminalView);
 
         FileReceiverActivity.updateFileReceiverActivityComponentsState(this);
@@ -281,6 +279,10 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             // Start the {@link TermuxService} and make it run regardless of who is bound to it
             Intent serviceIntent = new Intent(this, TermuxService.class);
             startService(serviceIntent);
+            if (getSharedPreferences("terminal_ui", MODE_PRIVATE).getBoolean("wake_lock_active", false)) {
+                startService(new Intent(this, TermuxService.class)
+                    .setAction(TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_LOCK));
+            }
 
             // Attempt to bind to the service, this will call the {@link #onServiceConnected(ComponentName, IBinder)}
             // callback if it succeeds.
@@ -325,23 +327,41 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         final long[] lastTapTime = {0L};
         final float[] lastTapX = {0f};
         final float[] lastTapY = {0f};
+        final float[] downX = {0f};
+        final float[] downY = {0f};
+        final long[] downTime = {0L};
+        final boolean[] moved = {false};
         final int[] tapCount = {0};
         final boolean[] multiTouchTap = {false};
         final float tapSlop = 48f * getResources().getDisplayMetrics().density;
         mTerminalView.setOnTouchListener((view, event) -> {
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_CANCEL) {
+            int action = event.getActionMasked();
+            if (action == android.view.MotionEvent.ACTION_DOWN) {
+                downX[0] = event.getX(); downY[0] = event.getY();
+                downTime[0] = SystemClock.uptimeMillis(); moved[0] = false;
+            } else if (action == android.view.MotionEvent.ACTION_MOVE) {
+                float dx = event.getX() - downX[0], dy = event.getY() - downY[0];
+                float slop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+                if (dx * dx + dy * dy > slop * slop) moved[0] = true;
+            } else if (action == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
+            if (action == android.view.MotionEvent.ACTION_CANCEL) {
                 tapCount[0] = 0;
                 multiTouchTap[0] = false;
                 return false;
             }
-            if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP) return false;
+            if (action != android.view.MotionEvent.ACTION_UP) return false;
+            long now = SystemClock.uptimeMillis();
+            float endDx = event.getX() - downX[0], endDy = event.getY() - downY[0];
+            float touchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+            if (moved[0] || endDx * endDx + endDy * endDy > touchSlop * touchSlop || now - downTime[0] > 300L) {
+                tapCount[0] = 0;
+                return false;
+            }
             if (multiTouchTap[0]) {
                 tapCount[0] = 0;
                 multiTouchTap[0] = false;
                 return false;
             }
-            long now = SystemClock.uptimeMillis();
             float dx = event.getX() - lastTapX[0];
             float dy = event.getY() - lastTapY[0];
             if (now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
@@ -492,6 +512,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
         ImageButton settings = findViewById(R.id.settings_button);
         if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
+        View drawer = findViewById(R.id.left_drawer);
+        if (drawer != null) drawer.setBackgroundColor(light ? Color.WHITE : Color.rgb(34, 34, 36));
+        View newSession = findViewById(R.id.new_session_button);
+        if (newSession instanceof com.google.android.material.button.MaterialButton) {
+            ((com.google.android.material.button.MaterialButton) newSession).setTextColor(Color.parseColor(light ? "#202124" : "#ffffff"));
+            ((com.google.android.material.button.MaterialButton) newSession).setBackgroundTintList(android.content.res.ColorStateList.valueOf(light ? Color.rgb(232, 232, 235) : Color.rgb(60, 60, 64)));
+        }
+        if (mTermuxSessionListViewController != null) mTermuxSessionListViewController.notifyDataSetChanged();
         if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -857,22 +885,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         });
     }
 
-    private void setToggleKeyboardView() {
-        findViewById(R.id.toggle_keyboard_button).setOnClickListener(v -> {
-            mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
-            getDrawer().closeDrawers();
-        });
-
-        findViewById(R.id.toggle_keyboard_button).setOnLongClickListener(v -> {
-            toggleTerminalToolbar();
-            return true;
-        });
-    }
-
-
-
-
-
     @SuppressLint("RtlHardcoded")
     @Override
     public void onBackPressed() {
@@ -1024,11 +1036,13 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         }
     }
     private void toggleKeepScreenOn() {
-        boolean enableWakeLock = !mPreferences.shouldKeepScreenOn();
-        mPreferences.setKeepScreenOn(enableWakeLock);
-        if (mTerminalView != null) mTerminalView.setKeepScreenOn(enableWakeLock);
-        if (enableWakeLock) getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
-        else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        android.content.SharedPreferences ui = getSharedPreferences("terminal_ui", MODE_PRIVATE);
+        boolean enableWakeLock = !ui.getBoolean("wake_lock_active", false);
+        ui.edit().putBoolean("wake_lock_active", enableWakeLock).apply();
+        String action = enableWakeLock
+            ? TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_LOCK
+            : TermuxConstants.TERMUX_APP.TERMUX_SERVICE.ACTION_WAKE_UNLOCK;
+        startService(new Intent(this, TermuxService.class).setAction(action));
     }
 
 
