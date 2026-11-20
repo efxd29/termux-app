@@ -386,7 +386,7 @@ public class TextSelectionCursorController implements CursorController {
         mSelY2 = terminalView.mEmulator.mRows - 1;
         mIsSelectingText = true;
         mShowStartTime = System.currentTimeMillis();
-        if (mActionMode == null) setActionModeCallBacks();
+        if (!mIsSelectingText || mActionMode == null) setActionModeCallBacks();
         mStartHandle.positionAtCursor(mSelX1, mSelY1, true);
         mEndHandle.positionAtCursor(mSelX2 + 1, mSelY2, true);
         terminalView.mClient.copyModeChanged(true);
