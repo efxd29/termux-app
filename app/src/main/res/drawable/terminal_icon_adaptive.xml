@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Enlarge the existing artwork into the adaptive-icon safe zone.
+         The original terminal_icon.png is reused unchanged. -->
+    <item
+        android:width="162dp"
+        android:height="162dp"
+        android:gravity="center">
+        <bitmap
+            android:src="@drawable/terminal_icon"
+            android:gravity="fill" />
+    </item>
+</layer-list>
