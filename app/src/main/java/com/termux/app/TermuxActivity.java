@@ -704,6 +704,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     /** Silence only the one-time fallback bootstrap chatter while keeping its full log and exit status. */
+    /** Silence only the one-time fallback bootstrap chatter while keeping its full log and exit status. */
     private void silenceBootstrapFallback() {
         File fallback = new File(new File(getFilesDir(), "usr/etc/profile.d"),
             "01-termux-bootstrap-second-stage-fallback.sh");
@@ -719,14 +720,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 script = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
             }
             if (script.contains(marker) || !script.contains("Starting fallback run of termux bootstrap second stage")) return;
-            script = script.replace("echo \\"Starting fallback run of termux bootstrap second stage\\"",
-                marker + "\\n:");
+            script = script.replace("echo \"Starting fallback run of termux bootstrap second stage\"",
+                marker + "\n:");
             script = script.replace(" || exit $?",
-                " >> \\"$PREFIX/var/log/termux-bootstrap-second-stage.log\\" 2>&1 || exit $?");
-            int firstNewline = script.indexOf('\\n');
+                " >> \"$PREFIX/var/log/termux-bootstrap-second-stage.log\" 2>&1 || exit $?");
+            int firstNewline = script.indexOf('\n');
             if (firstNewline >= 0) {
                 script = script.substring(0, firstNewline + 1)
-                    + "mkdir -p \\"$PREFIX/var/log\\" >/dev/null 2>&1\\n"
+                    + "mkdir -p \"$PREFIX/var/log\" >/dev/null 2>&1\n"
                     + script.substring(firstNewline + 1);
             }
             try (FileOutputStream out = new FileOutputStream(fallback, false)) {
