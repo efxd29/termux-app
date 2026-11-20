@@ -271,7 +271,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
 
         setNewSessionButtonView();
 
-        setToggleKeyboardView();
 
         registerForContextMenu(mTerminalView);
 
@@ -320,7 +319,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         setupSessionDrawerEffects();
     }
 
-    /** Two successive single-finger taps toggle Termux's extra-keys area. */
     /** Toggle extra keys only for two stationary taps; scrolling and swipes never count. */
     private void setupDoubleTapExtraKeysToggle() {
         final long[] lastTapTime = {0L};
@@ -968,24 +966,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             return true;
         });
     }
-
-    private void setToggleKeyboardView() {
-        // The drawer keyboard button is intentionally removed; keyboard visibility is controlled by stationary double tap.
-        View keyboardButton = findViewById(R.id.toggle_keyboard_button);
-        if (keyboardButton == null) return;
-        keyboardButton.setOnClickListener(v -> {
-            mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
-            getDrawer().closeDrawers();
-        });
-        keyboardButton.setOnLongClickListener(v -> {
-            toggleTerminalToolbar();
-            return true;
-        });
-    }
-
-
-
-
 
     @SuppressLint("RtlHardcoded")
     @Override
