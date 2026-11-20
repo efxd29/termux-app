@@ -18,7 +18,7 @@
         android:background="#35353a">
 
         <TextView android:id="@+id/macos_close" style="@style/MacTitleDot" android:text="●" android:textColor="#fe5e56" android:contentDescription="Quit session" />
-        <TextView android:id="@+id/macos_minimize" style="@style/MacTitleDot" android:text="●" android:textColor="#febc2e" android:contentDescription="Toggle wake lock" />
+        <TextView android:id="@+id/macos_minimize" style="@style/MacTitleDot" android:text="●" android:textColor="#febc2e" android:contentDescription="Open sessions" />
         <TextView android:id="@+id/macos_zoom" style="@style/MacTitleDot" android:text="●" android:textColor="#28c840" android:contentDescription="Back" />
 
         <LinearLayout
