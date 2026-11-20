@@ -1,6 +1,7 @@
 package com.termux.app.activities;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.os.Bundle;
 import android.os.Environment;
 
@@ -50,6 +51,9 @@ public class SettingsActivity extends AppCompatActivity {
 
         AppCompatActivityUtils.setToolbar(this, com.termux.shared.R.id.toolbar);
         AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
+        androidx.appcompat.widget.Toolbar settingsToolbar = findViewById(com.termux.shared.R.id.toolbar);
+        if (settingsToolbar != null) settingsToolbar.setBackgroundColor(Color.rgb(52, 52, 56));
+        getWindow().setStatusBarColor(Color.rgb(38, 38, 42));
     }
 
     @Override
