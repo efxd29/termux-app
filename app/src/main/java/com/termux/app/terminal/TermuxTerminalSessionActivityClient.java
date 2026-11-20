@@ -498,33 +498,21 @@ public class TermuxTerminalSessionActivityClient extends TermuxTerminalSessionCl
                 }
             }
 
-            if (mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE).getBoolean("light_mode", false)) {
+            boolean lightMode = mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE)
+                .getBoolean("light_mode", false);
+            if (lightMode) {
+                // Light mode changes only the default foreground/background, never ANSI colors.
                 props.setProperty("background", "#ffffff");
                 props.setProperty("foreground", "#1e1e1e");
                 props.setProperty("cursor", "#000000");
-                String[] readableAnsiColors = {
-                    "#000000", "#9c0000", "#006600", "#745400", "#0050a4", "#800080", "#006a70", "#202124",
-                    "#5f6368", "#c00000", "#008000", "#806000", "#175bca", "#a000a0", "#007c80", "#000000"
-                };
-                for (int i = 0; i < readableAnsiColors.length; i++)
-                    props.setProperty("color" + i, readableAnsiColors[i]);
             }
 
+            // Use the macOS title-bar blue for ANSI yellow in every UI mode.
+            // Keep all other ANSI colors identical between light and dark modes.
+            props.setProperty("color3", "#4fb0f0");
+            props.setProperty("color11", "#4fb0f0");
+
             TerminalColors.COLOR_SCHEME.updateWith(props);
-            if (mActivity.getSharedPreferences("terminal_ui", Activity.MODE_PRIVATE).getBoolean("light_mode", false)) {
-                int[] colors = TerminalColors.COLOR_SCHEME.mDefaultColors;
-                for (int i = 16; i < 256; i++) {
-                    int color = colors[i];
-                    int brightness = TerminalColors.getPerceivedBrightnessOfColor(color);
-                    if (brightness > 120) {
-                        float scale = 120f / brightness;
-                        colors[i] = 0xff000000
-                            | ((int)(((color >> 16) & 0xff) * scale) << 16)
-                            | ((int)(((color >> 8) & 0xff) * scale) << 8)
-                            | (int)((color & 0xff) * scale);
-                    }
-                }
-            }
             TerminalSession session = mActivity.getCurrentSession();
             if (session != null && session.getEmulator() != null) {
                 session.getEmulator().mColors.reset();
