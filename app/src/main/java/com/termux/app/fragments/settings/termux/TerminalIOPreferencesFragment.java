@@ -10,6 +10,8 @@ import androidx.preference.PreferenceManager;
 
 import com.termux.R;
 import com.termux.shared.termux.settings.preferences.TermuxAppSharedPreferences;
+import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
+
 
 @Keep
 public class TerminalIOPreferencesFragment extends PreferenceFragmentCompat {
@@ -23,6 +25,7 @@ public class TerminalIOPreferencesFragment extends PreferenceFragmentCompat {
         preferenceManager.setPreferenceDataStore(TerminalIOPreferencesDataStore.getInstance(context));
 
         setPreferencesFromResource(R.xml.termux_terminal_io_preferences, rootKey);
+
     }
 
 }
@@ -60,6 +63,9 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
             case "soft_keyboard_enabled_only_if_no_hardware":
                 mPreferences.setSoftKeyboardEnabledOnlyIfNoHardware(value);
                 break;
+            case "light_mode":
+                mContext.getSharedPreferences("terminal_ui", Context.MODE_PRIVATE).edit().putBoolean("light_mode", value).apply();
+                break;
             default:
                 break;
         }
@@ -74,6 +80,8 @@ class TerminalIOPreferencesDataStore extends PreferenceDataStore {
                 return mPreferences.isSoftKeyboardEnabled();
             case "soft_keyboard_enabled_only_if_no_hardware":
                 return mPreferences.isSoftKeyboardEnabledOnlyIfNoHardware();
+            case "light_mode":
+                return mContext.getSharedPreferences("terminal_ui", Context.MODE_PRIVATE).getBoolean("light_mode", false);
             default:
                 return false;
         }

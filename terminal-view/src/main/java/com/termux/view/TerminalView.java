@@ -584,6 +584,8 @@ public final class TerminalView extends View {
                 handleKeyCode(up ? KeyEvent.KEYCODE_DPAD_UP : KeyEvent.KEYCODE_DPAD_DOWN, 0);
             } else {
                 setTopRow(Math.min(0, Math.max(-(mEmulator.getScreen().getActiveTranscriptRows()), mTopRow + (up ? -1 : 1))));
+                if (up && !mEmulator.isAutoScrollDisabled()) mEmulator.toggleAutoScrollDisabled();
+                else if (!up && mTopRow == 0 && mEmulator.isAutoScrollDisabled()) mEmulator.toggleAutoScrollDisabled();
                 if (!awakenScrollBars()) invalidate();
             }
         }

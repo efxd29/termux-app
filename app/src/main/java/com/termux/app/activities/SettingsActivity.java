@@ -8,6 +8,7 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
+import androidx.preference.SwitchPreferenceCompat;
 
 import com.termux.R;
 import com.termux.shared.activities.ReportActivity;
@@ -25,6 +26,11 @@ import com.termux.shared.termux.TermuxConstants;
 import com.termux.shared.termux.TermuxUtils;
 import com.termux.shared.activity.media.AppCompatActivityUtils;
 import com.termux.shared.theme.NightMode;
+import com.termux.shared.termux.extrakeys.ExtraKeysConstants;
+import com.termux.shared.termux.extrakeys.ExtraKeysInfo;
+import com.termux.shared.termux.settings.properties.TermuxPropertyConstants;
+
+import org.json.JSONException;
 
 public class SettingsActivity extends AppCompatActivity {
 
@@ -44,6 +50,17 @@ public class SettingsActivity extends AppCompatActivity {
 
         AppCompatActivityUtils.setToolbar(this, com.termux.shared.R.id.toolbar);
         AppCompatActivityUtils.setShowBackButtonInActionBar(this, true);
+        androidx.appcompat.widget.Toolbar toolbar = findViewById(com.termux.shared.R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setBackgroundColor(android.graphics.Color.rgb(53, 53, 58));
+            toolbar.setTitleTextColor(android.graphics.Color.rgb(238, 238, 242));
+            if (toolbar.getNavigationIcon() != null) toolbar.getNavigationIcon().setTint(android.graphics.Color.WHITE);
+        }
+        getWindow().setStatusBarColor(android.graphics.Color.rgb(38, 38, 41));
+        if (android.os.Build.VERSION.SDK_INT >= 23) {
+            getWindow().getDecorView().setSystemUiVisibility(
+                getWindow().getDecorView().getSystemUiVisibility() & ~android.view.View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+        }
     }
 
     @Override
@@ -59,6 +76,7 @@ public class SettingsActivity extends AppCompatActivity {
             if (context == null) return;
 
             setPreferencesFromResource(R.xml.root_preferences, rootKey);
+            configureMacAppearancePreferences(context);
 
             new Thread() {
                 @Override
@@ -71,6 +89,46 @@ public class SettingsActivity extends AppCompatActivity {
                     configureDonatePreference(context);
                 }
             }.start();
+        }
+
+        private void configureMacAppearancePreferences(@NonNull Context context) {
+            android.content.SharedPreferences ui = context.getSharedPreferences("terminal_ui", Context.MODE_PRIVATE);
+            SwitchPreferenceCompat lightMode = findPreference("light_mode");
+            if (lightMode != null) {
+                lightMode.setChecked(ui.getBoolean("light_mode", false));
+                lightMode.setOnPreferenceChangeListener((preference, value) -> {
+                    ui.edit().putBoolean("light_mode", (Boolean) value).apply();
+                    return true;
+                });
+            }
+
+            SwitchPreferenceCompat statusBar = findPreference("show_status_bar");
+            if (statusBar != null) {
+                statusBar.setChecked(ui.getBoolean("show_status_bar", true));
+                statusBar.setOnPreferenceChangeListener((preference, value) -> {
+                    ui.edit().putBoolean("show_status_bar", (Boolean) value).apply();
+                    return true;
+                });
+            }
+
+            Preference keyboardLayout = findPreference("custom_extra_keys");
+            if (keyboardLayout != null) keyboardLayout.setOnPreferenceClickListener(preference -> {
+                String current = ui.getString("extra_keys", TermuxPropertyConstants.DEFAULT_IVALUE_EXTRA_KEYS);
+                CustomExtraKeysEditor.show(context, current, layout -> {
+                    try {
+                        ExtraKeysInfo parsed = new ExtraKeysInfo(layout, "default", ExtraKeysConstants.CONTROL_CHARS_ALIASES);
+                        int rows = parsed.getMatrix().length;
+                        if (rows < 1 || rows > 3) throw new IllegalArgumentException("Jumlah baris harus 1 sampai 3.");
+                        ui.edit().putString("extra_keys", layout).apply();
+                        keyboardLayout.setSummary("Layout tersimpan · " + rows + " baris");
+                    } catch (JSONException | IllegalArgumentException e) {
+                        new android.app.AlertDialog.Builder(context)
+                            .setMessage("Layout tombol tidak valid. Periksa tombol dan jumlah baris (maksimal 3).")
+                            .setPositiveButton(android.R.string.ok, null).show();
+                    }
+                });
+                return true;
+            });
         }
 
         private void configureTermuxAPIPreference(@NonNull Context context) {

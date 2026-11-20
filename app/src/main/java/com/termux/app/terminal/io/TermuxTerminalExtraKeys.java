@@ -53,7 +53,8 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
             // The mMap stores the extra key and style string values while loading properties
             // Check {@link #getExtraKeysInternalPropertyValueFromValue(String)} and
             // {@link #getExtraKeysStyleInternalPropertyValueFromValue(String)}
-            String extrakeys = (String) mActivity.getProperties().getInternalPropertyValue(TermuxPropertyConstants.KEY_EXTRA_KEYS, true);
+            String extrakeys = mActivity.getSharedPreferences("terminal_ui", android.content.Context.MODE_PRIVATE)
+                .getString("extra_keys", (String) mActivity.getProperties().getInternalPropertyValue(TermuxPropertyConstants.KEY_EXTRA_KEYS, true));
             String extraKeysStyle = (String) mActivity.getProperties().getInternalPropertyValue(TermuxPropertyConstants.KEY_EXTRA_KEYS_STYLE, true);
 
             ExtraKeysConstants.ExtraKeyDisplayMap extraKeyDisplayMap = ExtraKeysInfo.getCharDisplayMapForStyle(extraKeysStyle);
@@ -80,6 +81,8 @@ public class TermuxTerminalExtraKeys extends TerminalExtraKeys {
     public ExtraKeysInfo getExtraKeysInfo() {
         return mExtraKeysInfo;
     }
+
+    public void reloadCustomExtraKeys() { setExtraKeys(); }
 
     @SuppressLint("RtlHardcoded")
     @Override

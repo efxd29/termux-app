@@ -34,6 +34,24 @@
         app:isPreferenceVisible="false"
         app:fragment="com.termux.app.fragments.settings.TermuxWidgetPreferencesFragment"/>
 
+    <SwitchPreferenceCompat
+        app:key="light_mode"
+        app:title="Mode terang"
+        app:defaultValue="false"
+        app:persistent="false" />
+
+    <SwitchPreferenceCompat
+        app:key="show_status_bar"
+        app:title="Tampilkan status bar"
+        app:defaultValue="true"
+        app:persistent="false" />
+
+    <Preference
+        app:key="custom_extra_keys"
+        app:title="Atur tombol keyboard Termux"
+        app:summary="Susun tombol ekstra dalam 1–3 baris"
+        app:persistent="false" />
+
     <Preference
         app:key="about"
         app:title="@string/about_preference_title"

@@ -302,6 +302,13 @@ final class TermuxInstaller {
                     File sharedDir = Environment.getExternalStorageDirectory();
                     Os.symlink(sharedDir.getAbsolutePath(), new File(storageDir, "shared").getAbsolutePath());
 
+                    // Create a user-accessible Termux workspace at /storage/emulated/0/Termux.
+                    File termuxSharedDir = new File(sharedDir, "Termux");
+                    if (!termuxSharedDir.exists() && !termuxSharedDir.mkdirs()) {
+                        throw new java.io.IOException("Could not create shared Termux directory: " + termuxSharedDir.getAbsolutePath());
+                    }
+                    Os.symlink(termuxSharedDir.getAbsolutePath(), new File(storageDir, "Termux").getAbsolutePath());
+
                     File documentsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOCUMENTS);
                     Os.symlink(documentsDir.getAbsolutePath(), new File(storageDir, "documents").getAbsolutePath());
 
