@@ -528,12 +528,6 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
         ImageButton settings = findViewById(R.id.settings_button);
         if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
-        if (mExtraKeysView != null) {
-            mExtraKeysView.setButtonTextColor(light ? Color.BLACK : Color.WHITE);
-            mExtraKeysView.setButtonActiveTextColor(light ? Color.rgb(160, 105, 0) : Color.parseColor("#febc2e"));
-            if (mTermuxTerminalExtraKeys != null)
-                mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
-        }
         if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -693,6 +687,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         copyAssetIfAbsent("macos-shell.sh", new File(termuxConfig, "macos-shell.sh"));
         copyAssetIfAbsent("colors.properties", new File(termuxConfig, "colors.properties"));
         copyAssetReplacing("last-login.sh", new File(termuxConfig, "last-login.sh"));
+        silenceBootstrapFallback();
         appendShellConfig(new File(home, ".bash_profile"));
         appendShellConfig(new File(home, ".bashrc"));
         appendShellConfig(new File(home, ".zshrc"));
@@ -705,6 +700,40 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (motd.isFile()) {
             try (FileOutputStream out = new FileOutputStream(motd, false)) { out.write(new byte[0]); }
             catch (Exception e) { Logger.logStackTraceWithMessage(LOG_TAG, "Could not clear Termux MOTD", e); }
+        }
+    }
+
+    /** Silence only the one-time fallback bootstrap chatter while keeping its full log and exit status. */
+    private void silenceBootstrapFallback() {
+        File fallback = new File(new File(getFilesDir(), "usr/etc/profile.d"),
+            "01-termux-bootstrap-second-stage-fallback.sh");
+        if (!fallback.isFile()) return;
+        final String marker = "# TERMUX_CUSTOM_QUIET_SECOND_STAGE";
+        try {
+            String script;
+            try (FileInputStream in = new FileInputStream(fallback);
+                 ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                byte[] buffer = new byte[4096];
+                int count;
+                while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                script = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+            }
+            if (script.contains(marker) || !script.contains("Starting fallback run of termux bootstrap second stage")) return;
+            script = script.replace("echo \\"Starting fallback run of termux bootstrap second stage\\"",
+                marker + "\\n:");
+            script = script.replace(" || exit $?",
+                " >> \\"$PREFIX/var/log/termux-bootstrap-second-stage.log\\" 2>&1 || exit $?");
+            int firstNewline = script.indexOf('\\n');
+            if (firstNewline >= 0) {
+                script = script.substring(0, firstNewline + 1)
+                    + "mkdir -p \\"$PREFIX/var/log\\" >/dev/null 2>&1\\n"
+                    + script.substring(firstNewline + 1);
+            }
+            try (FileOutputStream out = new FileOutputStream(fallback, false)) {
+                out.write(script.getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not quiet bootstrap fallback output", e);
         }
     }
 
@@ -735,7 +764,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
             }
             if (current.contains(marker)) return;
             try (FileOutputStream out = new FileOutputStream(target, true)) {
-                out.write(("\\n" + marker + "\\n[ -r \\"$HOME/.termux/last-login.sh\\" ] && . \\"$HOME/.termux/last-login.sh\\"\\n").getBytes(StandardCharsets.UTF_8));
+                out.write(("\n" + marker + "\n[ -r \"$HOME/.termux/last-login.sh\" ] && . \"$HOME/.termux/last-login.sh\"\n").getBytes(StandardCharsets.UTF_8));
             }
         } catch (Exception e) {
             Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure Last Login in " + target.getName(), e);
@@ -938,12 +967,14 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     private void setToggleKeyboardView() {
-        findViewById(R.id.toggle_keyboard_button).setOnClickListener(v -> {
+        // The drawer keyboard button is intentionally removed; keyboard visibility is controlled by stationary double tap.
+        View keyboardButton = findViewById(R.id.toggle_keyboard_button);
+        if (keyboardButton == null) return;
+        keyboardButton.setOnClickListener(v -> {
             mTermuxTerminalViewClient.onToggleSoftKeyboardRequest();
             getDrawer().closeDrawers();
         });
-
-        findViewById(R.id.toggle_keyboard_button).setOnLongClickListener(v -> {
+        keyboardButton.setOnLongClickListener(v -> {
             toggleTerminalToolbar();
             return true;
         });
