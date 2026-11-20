@@ -132,8 +132,8 @@ public class TermuxAppSharedPreferences extends AppSharedPreferences {
         sizes[1] = (int) (4f * dipInPixels); // min
 
         // http://www.google.com/design/spec/style/typography.html#typography-line-height
-        // Restore the normal 12dp terminal font size, matching the reference screenshot.
-        int defaultFontSize = Math.round(12 * dipInPixels);
+        // Set the requested 10.5dp default terminal font size.
+        int defaultFontSize = Math.round(10.5f * dipInPixels);
         // Make it divisible by 2 since that is the minimal adjustment step:
         if (defaultFontSize % 2 == 1) defaultFontSize--;
 
