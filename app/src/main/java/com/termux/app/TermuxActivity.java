@@ -528,6 +528,8 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
         ImageButton settings = findViewById(R.id.settings_button);
         if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
+        TextView newSessionButton = findViewById(R.id.new_session_button);
+        if (newSessionButton != null) newSessionButton.setTextColor(light ? Color.BLACK : Color.WHITE);
         if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
