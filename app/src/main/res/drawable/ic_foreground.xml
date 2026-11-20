@@ -3,26 +3,15 @@
     android:width="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-
-    <!-- Keep in sync with non-adaptive ic_launcher.xml -->
+    <path
+        android:fillColor="#202020"
+        android:strokeColor="#E5F2F5"
+        android:strokeWidth="2"
+        android:pathData="M39,25 H69 C77,25 83,31 83,39 V69 C83,77 77,83 69,83 H39 C31,83 25,77 25,69 V39 C25,31 31,25 39,25 Z"/>
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M34,38
-                          h6
-                          l12,16
-                          l-12,16
-                          h-6
-                          l12,-16
-                          "
-        />
-
+        android:pathData="M34,38 H40 L52,54 L40,70 H34 L46,54 Z"/>
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M56,66
-                          h18
-                          v4
-                          h-18
-                          "
-        />
-
+        android:pathData="M56,66 H74 V70 H56 Z"/>
 </vector>
