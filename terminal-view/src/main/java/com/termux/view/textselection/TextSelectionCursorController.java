@@ -33,6 +33,7 @@ public class TextSelectionCursorController implements CursorController {
     public final int ACTION_COPY = 1;
     public final int ACTION_PASTE = 2;
     public final int ACTION_MORE = 3;
+    public final int ACTION_SELECT_ALL = 4;
 
     public TextSelectionCursorController(TerminalView terminalView) {
         this.terminalView = terminalView;
@@ -115,6 +116,7 @@ public class TextSelectionCursorController implements CursorController {
 
                 ClipboardManager clipboard = (ClipboardManager) terminalView.getContext().getSystemService(Context.CLIPBOARD_SERVICE);
                 menu.add(Menu.NONE, ACTION_COPY, Menu.NONE, R.string.copy_text).setShowAsAction(show);
+                menu.add(Menu.NONE, ACTION_SELECT_ALL, Menu.NONE, "Select all").setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_PASTE, Menu.NONE, R.string.paste_text).setEnabled(clipboard != null && clipboard.hasPrimaryClip()).setShowAsAction(show);
                 menu.add(Menu.NONE, ACTION_MORE, Menu.NONE, R.string.text_selection_more);
                 return true;
@@ -137,6 +139,9 @@ public class TextSelectionCursorController implements CursorController {
                         String selectedText = getSelectedText();
                         terminalView.mTermSession.onCopyTextToClipboard(selectedText);
                         terminalView.stopTextSelectionMode();
+                        break;
+                    case ACTION_SELECT_ALL:
+                        selectAll();
                         break;
                     case ACTION_PASTE:
                         terminalView.stopTextSelectionMode();
@@ -368,6 +373,24 @@ public class TextSelectionCursorController implements CursorController {
         sel[1] = mSelY2;
         sel[2] = mSelX1;
         sel[3] = mSelX2;
+    }
+
+    /** Select all scrollback rows and the visible terminal screen. */
+    public void selectAll() {
+        if (terminalView.mEmulator == null) return;
+        TerminalBuffer screen = terminalView.mEmulator.getScreen();
+        int scrollRows = screen.getActiveRows() - terminalView.mEmulator.mRows;
+        mSelX1 = 0;
+        mSelY1 = -scrollRows;
+        mSelX2 = terminalView.mEmulator.mColumns - 1;
+        mSelY2 = terminalView.mEmulator.mRows - 1;
+        mIsSelectingText = true;
+        mShowStartTime = System.currentTimeMillis();
+        if (mActionMode == null) setActionModeCallBacks();
+        mStartHandle.positionAtCursor(mSelX1, mSelY1, true);
+        mEndHandle.positionAtCursor(mSelX2 + 1, mSelY2, true);
+        terminalView.mClient.copyModeChanged(true);
+        terminalView.invalidate();
     }
 
     /** Get the currently selected text. */
