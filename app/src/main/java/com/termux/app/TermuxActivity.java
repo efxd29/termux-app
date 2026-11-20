@@ -454,7 +454,7 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
                 if (titleParts.length >= 2) shell = "-" + titleParts[0];
                 String cwd = titleParts.length >= 2 ? titleParts[1] : titleParts[0];
                 if (titleParts.length >= 3 && "tmux".equals(titleParts[2])) shell = "-" + titleParts[0] + " (tmux)";
-                if (cwd.startsWith( "Termux ")) cwd = cwd.substring( "Termux ".length());
+                if (cwd.startsWith("@Termux ")) cwd = cwd.substring("@Termux ".length());
                 int slash = cwd.lastIndexOf('/');
                 folder = slash >= 0 && slash + 1 < cwd.length() ? cwd.substring(slash + 1) : cwd;
                 if ("/".equals(cwd)) folder = "/";
