@@ -321,42 +321,78 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
     }
 
     /** Two successive single-finger taps toggle Termux's extra-keys area. */
+    /** Toggle extra keys only for two stationary taps; scrolling and swipes never count. */
     private void setupDoubleTapExtraKeysToggle() {
         final long[] lastTapTime = {0L};
         final float[] lastTapX = {0f};
         final float[] lastTapY = {0f};
+        final float[] downX = {0f};
+        final float[] downY = {0f};
+        final long[] downTime = {0L};
+        final boolean[] moved = {false};
+        final boolean[] multiTouch = {false};
         final int[] tapCount = {0};
-        final boolean[] multiTouchTap = {false};
-        final float tapSlop = 48f * getResources().getDisplayMetrics().density;
+        final float touchSlop = android.view.ViewConfiguration.get(this).getScaledTouchSlop();
+        final long maximumTapDuration = 250L;
+        final long doubleTapTimeout = 350L;
+
         mTerminalView.setOnTouchListener((view, event) -> {
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_POINTER_DOWN) multiTouchTap[0] = true;
-            if (event.getActionMasked() == android.view.MotionEvent.ACTION_CANCEL) {
-                tapCount[0] = 0;
-                multiTouchTap[0] = false;
-                return false;
+            switch (event.getActionMasked()) {
+                case android.view.MotionEvent.ACTION_DOWN:
+                    downX[0] = event.getX();
+                    downY[0] = event.getY();
+                    downTime[0] = event.getEventTime();
+                    moved[0] = false;
+                    multiTouch[0] = false;
+                    return false;
+
+                case android.view.MotionEvent.ACTION_POINTER_DOWN:
+                    multiTouch[0] = true;
+                    tapCount[0] = 0;
+                    return false;
+
+                case android.view.MotionEvent.ACTION_MOVE:
+                    float dxMove = event.getX() - downX[0];
+                    float dyMove = event.getY() - downY[0];
+                    if (dxMove * dxMove + dyMove * dyMove > touchSlop * touchSlop) {
+                        moved[0] = true;
+                        tapCount[0] = 0;
+                    }
+                    return false;
+
+                case android.view.MotionEvent.ACTION_CANCEL:
+                case android.view.MotionEvent.ACTION_OUTSIDE:
+                    moved[0] = true;
+                    tapCount[0] = 0;
+                    multiTouch[0] = false;
+                    return false;
+
+                case android.view.MotionEvent.ACTION_UP:
+                    long duration = event.getEventTime() - downTime[0];
+                    if (moved[0] || multiTouch[0] || duration > maximumTapDuration) {
+                        tapCount[0] = 0;
+                        multiTouch[0] = false;
+                        return false;
+                    }
+
+                    long now = event.getEventTime();
+                    float dx = event.getX() - lastTapX[0];
+                    float dy = event.getY() - lastTapY[0];
+                    if (tapCount[0] == 1 && now - lastTapTime[0] <= doubleTapTimeout
+                        && dx * dx + dy * dy <= touchSlop * touchSlop) {
+                        tapCount[0] = 0;
+                        toggleTerminalToolbar();
+                    } else {
+                        tapCount[0] = 1;
+                    }
+                    lastTapTime[0] = now;
+                    lastTapX[0] = event.getX();
+                    lastTapY[0] = event.getY();
+                    return false;
+
+                default:
+                    return false;
             }
-            if (event.getActionMasked() != android.view.MotionEvent.ACTION_UP) return false;
-            if (multiTouchTap[0]) {
-                tapCount[0] = 0;
-                multiTouchTap[0] = false;
-                return false;
-            }
-            long now = SystemClock.uptimeMillis();
-            float dx = event.getX() - lastTapX[0];
-            float dy = event.getY() - lastTapY[0];
-            if (now - lastTapTime[0] <= 650L && dx * dx + dy * dy <= tapSlop * tapSlop) {
-                tapCount[0]++;
-            } else {
-                tapCount[0] = 1;
-            }
-            lastTapTime[0] = now;
-            lastTapX[0] = event.getX();
-            lastTapY[0] = event.getY();
-            if (tapCount[0] == 2) {
-                toggleTerminalToolbar();
-                tapCount[0] = 0;
-            }
-            return false;
         });
     }
 
@@ -492,6 +528,12 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (title != null) title.setTextColor(Color.parseColor(light ? "#55555d" : "#a0a0a8"));
         ImageButton settings = findViewById(R.id.settings_button);
         if (settings != null) settings.setColorFilter(Color.parseColor(light ? "#202124" : "#ffffff"));
+        if (mExtraKeysView != null) {
+            mExtraKeysView.setButtonTextColor(light ? Color.BLACK : Color.WHITE);
+            mExtraKeysView.setButtonActiveTextColor(light ? Color.rgb(160, 105, 0) : Color.parseColor("#febc2e"));
+            if (mTermuxTerminalExtraKeys != null)
+                mExtraKeysView.reload(mTermuxTerminalExtraKeys.getExtraKeysInfo(), mTerminalToolbarDefaultHeight);
+        }
         if (showStatusBar) getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         else getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
@@ -650,15 +692,53 @@ public final class TermuxActivity extends AppCompatActivity implements ServiceCo
         if (!termuxConfig.exists() && !termuxConfig.mkdirs()) return;
         copyAssetIfAbsent("macos-shell.sh", new File(termuxConfig, "macos-shell.sh"));
         copyAssetIfAbsent("colors.properties", new File(termuxConfig, "colors.properties"));
+        copyAssetReplacing("last-login.sh", new File(termuxConfig, "last-login.sh"));
         appendShellConfig(new File(home, ".bash_profile"));
         appendShellConfig(new File(home, ".bashrc"));
         appendShellConfig(new File(home, ".zshrc"));
+        appendLastLoginConfig(new File(home, ".bash_profile"));
+        appendLastLoginConfig(new File(home, ".bashrc"));
+        appendLastLoginConfig(new File(home, ".zshrc"));
 
         // The welcome text is the bootstrap MOTD; blank it after bootstrap and before the first shell.
         File motd = new File(new File(getFilesDir(), "usr/etc"), "motd");
         if (motd.isFile()) {
             try (FileOutputStream out = new FileOutputStream(motd, false)) { out.write(new byte[0]); }
             catch (Exception e) { Logger.logStackTraceWithMessage(LOG_TAG, "Could not clear Termux MOTD", e); }
+        }
+    }
+
+    /** Replace only the app-managed helper script so existing installations receive updates. */
+    private void copyAssetReplacing(String asset, File target) {
+        try (InputStream in = getAssets().open(asset); FileOutputStream out = new FileOutputStream(target, false)) {
+            byte[] buffer = new byte[4096];
+            int count;
+            while ((count = in.read(buffer)) != -1) out.write(buffer, 0, count);
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not install " + asset, e);
+        }
+    }
+
+    /** Add the app-managed last-login hook without editing or replacing user configuration. */
+    private void appendLastLoginConfig(File target) {
+        final String marker = "# Termux app-managed Last Login";
+        try {
+            String current = "";
+            if (target.isFile()) {
+                try (FileInputStream in = new FileInputStream(target);
+                     ByteArrayOutputStream bytes = new ByteArrayOutputStream()) {
+                    byte[] buffer = new byte[4096];
+                    int count;
+                    while ((count = in.read(buffer)) != -1) bytes.write(buffer, 0, count);
+                    current = new String(bytes.toByteArray(), StandardCharsets.UTF_8);
+                }
+            }
+            if (current.contains(marker)) return;
+            try (FileOutputStream out = new FileOutputStream(target, true)) {
+                out.write(("\\n" + marker + "\\n[ -r \\"$HOME/.termux/last-login.sh\\" ] && . \\"$HOME/.termux/last-login.sh\\"\\n").getBytes(StandardCharsets.UTF_8));
+            }
+        } catch (Exception e) {
+            Logger.logStackTraceWithMessage(LOG_TAG, "Could not configure Last Login in " + target.getName(), e);
         }
     }
 
