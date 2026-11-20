@@ -216,6 +216,7 @@ public final class CustomExtraKeysEditor {
         LinearLayout keyboard = new LinearLayout(context);
         keyboard.setOrientation(LinearLayout.VERTICAL);
         ArrayList<String> selected = new ArrayList<>();
+        AlertDialog[] pickerRef = {null};
         for (String[] keyRow : PALETTE) {
             HorizontalScrollView horizontal = new HorizontalScrollView(context);
             horizontal.setHorizontalScrollBarEnabled(false);
@@ -235,6 +236,7 @@ public final class CustomExtraKeysEditor {
                     if (!macro) {
                         rows.get(row).set(index, value);
                         render.run();
+                        if (pickerRef[0] != null) pickerRef[0].dismiss();
                     } else if (selected.contains(value)) {
                         selected.remove(value);
                         key.setBackgroundTintList(android.content.res.ColorStateList.valueOf(keyColor));
@@ -275,6 +277,7 @@ public final class CustomExtraKeysEditor {
                 });
         }
         AlertDialog picker = builder.create();
+        pickerRef[0] = picker;
         picker.setOnShowListener(d -> {
             if (picker.getWindow() != null) picker.getWindow().setBackgroundDrawableResource(android.R.color.transparent);
             picker.getButton(AlertDialog.BUTTON_NEGATIVE).setTextColor(foreground);
