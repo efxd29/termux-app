@@ -1439,6 +1439,13 @@ public final class TerminalView extends View {
         invalidate();
     }
 
+    /** Select the complete scrollback and visible terminal contents. */
+    public void selectAllText() {
+        if (mEmulator == null) return;
+        getTextSelectionCursorController().selectAll();
+        invalidate();
+    }
+
     public void stopTextSelectionMode() {
         if (hideTextSelectionCursors()) {
             mClient.copyModeChanged(isSelectingText());
