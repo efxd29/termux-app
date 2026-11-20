@@ -56,7 +56,10 @@ public class TermuxSessionsListViewController extends ArrayAdapter<TermuxSession
             return sessionRowView;
         }
 
-        boolean shouldEnableDarkTheme = ThemeUtils.shouldEnableDarkTheme(mActivity, NightMode.getAppNightMode().getName());
+        boolean customLightMode = mActivity.getSharedPreferences("terminal_ui", android.content.Context.MODE_PRIVATE)
+            .getBoolean("light_mode", false);
+        boolean shouldEnableDarkTheme = !customLightMode &&
+            ThemeUtils.shouldEnableDarkTheme(mActivity, NightMode.getAppNightMode().getName());
 
         String name = sessionAtRow.mSessionName;
         String sessionTitle = sessionAtRow.getTitle();
