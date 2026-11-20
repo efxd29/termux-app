@@ -125,6 +125,7 @@ public final class CustomExtraKeysEditor {
                 for (String value : paletteRow) {
                     MaterialButton key = new MaterialButton(context);
                     key.setText(value);
+                    key.setContentDescription("Tambahkan tombol " + value + " ke baris terpilih");
                     key.setTextColor(textColor);
                     key.setBackgroundTintList(android.content.res.ColorStateList.valueOf(keyBg));
                     key.setRippleColor(android.content.res.ColorStateList.valueOf(Color.TRANSPARENT));
@@ -224,6 +225,7 @@ public final class CustomExtraKeysEditor {
             for (String value : keyRow) {
                 MaterialButton key = new MaterialButton(context);
                 key.setText(value);
+                key.setContentDescription("Pilih tombol " + value);
                 key.setTextSize(11);
                 key.setTextColor(foreground);
                 key.setMinWidth(dp(context, 50)); key.setMinimumWidth(dp(context, 50));
